@@ -1,0 +1,57 @@
+name: SHAuctions
+version: '${project.version}'
+main: org.Cry_Legende.sHAuctions.SHAuctions
+api-version: '1.20'
+author: Cry_Legende
+softdepend: [Vault] # Dépendance optionnelle pour l'économie, mais fortement recommandée
+
+commands:
+  hdv: # Ou 'ah', 'auction', etc.
+    description: Ouvre l'hôtel des ventes ou gère les enchères.
+    usage: "/hdv [sell <prix>|history|expired|reload|...]"
+    aliases: [ah, auctionhouse]
+  # On pourrait aussi définir les sous-commandes ici, mais c'est souvent mieux géré en interne
+
+permissions:
+  shauctions.use:
+    description: Permet d'utiliser les fonctionnalités de base de l'HDV (ouvrir, voir).
+    default: true
+  shauctions.sell:
+    description: Permet de mettre des items en vente.
+    default: true
+  shauctions.buy:
+    description: Permet d'acheter des items.
+    default: true
+  shauctions.bid:
+    description: Permet de mettre des items aux enchères et de miser.
+    default: true
+  shauctions.menu.bids:
+    description: Permet d'ouvrir la page des Enchères.
+    default: true
+  shauctions.menu.ownsales:
+    description: Affiche le bouton "Vos objets en vente" dans les menus.
+    default: true
+  shauctions.menu.expired:
+    description: Affiche le bouton "Vos invendus" dans les menus.
+    default: true
+  shauctions.menu.history:
+    description: Affiche le bouton "Historique des ventes" dans les menus.
+    default: true
+  shauctions.history.self:
+    description: Permet de voir son propre historique de ventes.
+    default: true
+  shauctions.history.global:
+    description: Permet de voir l'historique global des ventes.
+    default: op
+  shauctions.expired.claim:
+    description: Permet de réclamer ses items expirés.
+    default: true
+  shauctions.cancel.self:
+    description: Permet d'annuler ses propres ventes.
+    default: true
+  shauctions.cancel.others:
+    description: Permet d'annuler les ventes des autres joueurs (admin).
+    default: op
+  shauctions.reload:
+    description: Permet de recharger la configuration du plugin.
+    default: op

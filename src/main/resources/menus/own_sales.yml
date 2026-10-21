@@ -1,0 +1,104 @@
+# Configuration du menu des ventes en cours du joueur
+
+title: "&8&lHDV &r| Ventes en Cours ({currentPage}/{totalPages})"
+size: 54
+
+auction_item_slots:
+  - 20
+  - 21
+  - 22
+  - 23
+  - 24
+  - 25
+# Lignes préfixées {sale} = ventes directes uniquement, {bid} = enchères uniquement.
+# Le marqueur est retiré et la ligne masquée si le type ne correspond pas.
+auction_item_format:
+  name: "{ItemName}"
+  lore:
+    - "{ItemLore}"
+    - "&f&m                                       &r"
+    - "{sale}&fPrix : &e{Price} {CurrencySymbol}"
+    - "{bid}&fType : &6Enchère"
+    - "{bid}&fPrix de départ : &e{StartingPrice} {CurrencySymbol}"
+    - "{bid}&fMise actuelle : &e{CurrentBid}"
+    - "{bid}&fMeilleur enchérisseur : &e{HighestBidder}"
+    - "&fExpire dans : &e{RemainingTime}"
+    - ""
+    - "&cCliquez pour annuler cette vente."
+    - "&f&m                                       &r"
+
+items:
+  '48':
+    material: ARROW
+    name: "&fPage Précédente"
+    action: { type: PREVIOUS_PAGE }
+
+  '49':
+    material: PAPER
+    name: "&c&l⤾ Retour &7(clic)"
+    action:
+      type: OPEN_MENU
+      value: "main_auction_house"
+
+  '50':
+    material: ARROW
+    name: "&fPage Suivante"
+    action: { type: NEXT_PAGE }
+
+  # Bouton "Enchères"
+  '45':
+    material: GOLD_INGOT
+    name: "&6&lEnchères"
+    lore:
+      - "&7Voir les objets aux enchères."
+    action:
+      type: OPEN_MENU
+      value: "auction_bids"
+    requires_permission: false
+    permission_node: "shauctions.menu.bids"
+
+  # Bouton "Vos invendus"
+  '46':
+    material: POISONOUS_POTATO
+    name: "&2Vos Invendus"
+    lore:
+      - "&7Récupérez vos items expirés (ventes et enchères)."
+    action:
+      type: OPEN_MENU
+      value: "expired_items"
+    requires_permission: false
+    permission_node: "shauctions.menu.expired"
+
+  # Bouton "Historique des ventes"
+  '53':
+    material: BELL
+    name: "&x&F&F&A&7&5&1Historique des Ventes"
+    lore:
+      - "&7Voir l'historique des ventes et enchères."
+    action:
+      type: OPEN_MENU
+      value: "sales_history"
+    requires_permission: false
+    permission_node: "shauctions.menu.history"
+
+  # Item spécial si aucune vente en cours
+  # '-2':
+  #   material: BARRIER
+  #   name: "&cAucune vente en cours"
+  #   lore:
+  #     - "&7Vous n'avez aucun item en vente actuellement."
+  #   action: { type: INFO }
+
+  # Fillers...
+  '0': { material: GRAY_STAINED_GLASS_PANE, name: " ", action: { type: FILLER } }
+  '1': { material: GRAY_STAINED_GLASS_PANE, name: " ", action: { type: FILLER } }
+  '7': { material: GRAY_STAINED_GLASS_PANE, name: " ", action: { type: FILLER } }
+  '8': { material: GRAY_STAINED_GLASS_PANE, name: " ", action: { type: FILLER } }
+  '9': { material: GRAY_STAINED_GLASS_PANE, name: " ", action: { type: FILLER } }
+  '17': { material: GRAY_STAINED_GLASS_PANE, name: " ", action: { type: FILLER } }
+  '47': { material: GRAY_STAINED_GLASS_PANE, name: " ", action: { type: FILLER } }
+  '51': { material: GRAY_STAINED_GLASS_PANE, name: " ", action: { type: FILLER } }
+  '52': { material: GRAY_STAINED_GLASS_PANE, name: " ", action: { type: FILLER } }
+
+options:
+  open_sound: "BLOCK_CHEST_OPEN"

@@ -1,0 +1,188 @@
+# Configuration du menu principal de l'Hôtel des Ventes
+# Nom du fichier (sans .yml) devient le nom du menu, ex: "main_auction_house"
+
+title: "&lMenu &r| Hôtel des ventes ({currentPage}/{totalPages})" # {currentPage} et {totalPages} sont des placeholders dynamiques
+size: 54 # Doit être un multiple de 9 (9, 18, 27, 36, 45, 54)
+
+# Slots spécifiques pour les items d'enchère. Ces slots seront remplis dynamiquement.
+# Le nombre d'items par page sera déterminé par la taille de cette liste.
+auction_item_slots:
+  - 10
+  - 11
+  - 12
+  - 13
+  - 14
+  - 15
+  - 16
+  - 19
+  - 20
+  - 21
+  - 22
+  - 23
+  - 24
+  - 25
+  - 28
+  - 29
+  - 30
+  - 31
+  - 32
+  - 33
+  - 34
+  # Ajoutez autant de slots que vous voulez d'items par page
+
+# Format des items d'enchère affichés dans les auction_item_slots
+# Les placeholders comme {ItemName}, {Price}, {OwnerName}, {RemainingTime} seront remplacés dynamiquement.
+auction_item_format:
+  # Le matériau ici peut être un placeholder si vous voulez qu'il change (ex: {ItemMaterial})
+  # ou un matériau fixe (ex: PAPER) si l'item réel est affiché. Souvent, on affiche l'item réel.
+  # Si vous voulez afficher l'item réel, n'indiquez pas de 'material' ici, le système utilisera l'item de l'enchère.
+  # Si vous spécifiez un 'material' ici, il remplacera l'item de l'enchère par celui-ci, mais gardera le nom/lore.
+  # material: PAPER # Optionnel: si vous voulez forcer un matériau pour tous les items d'enchère
+  name: "{ItemName}" # Sera remplacé par le nom de l'item
+  lore:
+    - "{ItemLore}" # Placeholder pour le lore original de l'item
+    - "&f&m                                       &r"
+    - ""
+    - "&fPrix : &x&F&F&E&2&5&9{Price} {CurrencySymbol}"
+    - "&fVendeur : &x&F&F&E&2&5&9{OwnerName}"
+    - "&fExpire dans : &x&F&F&E&2&5&9{RemainingTime}" # Sera formaté selon config.yml
+    - ""
+    - "&7&o(( &e&oCliquez pour acheter &7&o))"
+    # Ligne réservée au staff : {staff} est retiré et la ligne masquée aux joueurs sans permission d'annulation.
+    - "{staff}&c&o(( Clic droit : annuler cette vente ))"
+
+# Items fixes dans le GUI
+items:
+  # Fillers (vitres grises par exemple)
+  '0':
+    material: GRAY_STAINED_GLASS_PANE
+    name: " "
+    action:
+      type: FILLER # Action spéciale pour indiquer que c'est juste un remplissage non cliquable
+  # ... Répétez pour 1, 7, 8, 9, 17, etc. les bordures ...
+  '1': { material: GRAY_STAINED_GLASS_PANE, name: " ", action: { type: FILLER } }
+  '7': { material: GRAY_STAINED_GLASS_PANE, name: " ", action: { type: FILLER } }
+  '8': { material: GRAY_STAINED_GLASS_PANE, name: " ", action: { type: FILLER } }
+  '9': { material: GRAY_STAINED_GLASS_PANE, name: " ", action: { type: FILLER } }
+  '17': { material: GRAY_STAINED_GLASS_PANE, name: " ", action: { type: FILLER } }
+  '47': { material: GRAY_STAINED_GLASS_PANE, name: " ", action: { type: FILLER } }
+  '51': { material: GRAY_STAINED_GLASS_PANE, name: " ", action: { type: FILLER } }
+
+
+  # Bouton Page Précédente
+  '48':
+    material: ARROW
+    name: "&fPage Précédente"
+    lore:
+      - ""
+    action:
+      type: PREVIOUS_PAGE
+    # Optionnel: item de remplacement si pas de page précédente
+    # replacement_if_unavailable: # Non implémenté dans le parseur actuel, mais une idée
+    #   material: BARRIER
+    #   name: "&cPas de page précédente"
+
+  # Bouton Retour (exemple: exécute une commande d'un autre plugin)
+  '49':
+    material: PAPER # Ou OAK_DOOR, etc.
+    name: "&c⤾ Retour &7(clic)"
+    lore:
+      - ""
+    action:
+      type: COMMAND # Le joueur exécute la commande
+      value: "dm open island_more" # Commande à exécuter. Peut être "player:menu_principal" ou "console:broadcast {player} est retourné"
+      # Pour exécuter en tant que console: "console:say Hello {player}"
+      # Pour exécuter en tant que joueur: "player:warp spawn" ou juste "warp spawn" (par défaut player)
+      # {player} est un placeholder pour le nom du joueur
+
+  # Bouton Page Suivante
+  '50':
+    material: ARROW
+    name: "&fPage Suivante"
+    lore:
+      - ""
+    action:
+      type: NEXT_PAGE
+
+  # Bouton "Vos objets en vente"
+  '45':
+    material: DIAMOND
+    name: "&bVos Objets en Vente"
+    lore:
+      - "&7Voir les items que vous avez mis en vente."
+    action:
+      type: OPEN_MENU # Ouvre un autre menu défini par SHAuctions
+      value: "own_sales" # Nom du fichier YML du menu à ouvrir (sans .yml)
+    requires_permission: false # L'item ne s'affiche/fonctionne que si le joueur a la perm
+    permission_node: "shauctions.menu.ownsales" # Perm à vérifier
+
+  # Bouton "Vos invendus"
+  '46':
+    material: POISONOUS_POTATO
+    name: "&2Vos Invendus"
+    lore:
+      - "&7Récupérez vos items expirés."
+    action:
+      type: OPEN_MENU
+      value: "expired_items"
+    requires_permission: false
+    permission_node: "shauctions.menu.expired"
+
+  # Bouton "Enchères" (nouvelle page)
+  '52':
+    material: GOLD_INGOT
+    name: "&6&lEnchères"
+    lore:
+      - "&7"
+      - "&8&l« &fParcourez les objets mis aux &6enchères&f."
+      - "&fCliquez sur un objet pour placer votre mise. &8&l»"
+      - ""
+      - "&8• &fPour mettre un objet aux enchères, placez-le"
+      - "&fen main et faites &6/hdv bid <prix de départ>"
+    action:
+      type: OPEN_MENU
+      value: "auction_bids"
+    requires_permission: false
+    permission_node: "shauctions.menu.bids"
+
+  # Bouton "Historique des ventes"
+  '53':
+    material: BELL
+    name: "&x&F&F&A&7&5&1Historique des Ventes"
+    lore:
+      - "&7Voir l'historique des ventes."
+    action:
+      type: OPEN_MENU
+      value: "sales_history"
+    requires_permission: false
+    permission_node: "shauctions.menu.history"
+
+  # Bouton d'informations
+  '4':
+    material: BOOK # Ou PLAYER_HEAD avec une texture
+    name: "&eInformations"
+    lore:
+      - "&7"
+      - "&8&l« &fCeci est &x&F&F&A&7&5&1l'Hôtel des Ventes&f. Ici vous"
+      - "&fpouvez vendre des items ou acquérir"
+      - "&fdes items que d'autres ont mis en vente. &8&l»"
+      - ""
+      - "&8• &fPour vendre un item ici placez le dans"
+      - "&fvotre main et faites &x&F&F&A&7&5&1/hdv sell <prix>"
+      - "&8• &fPour une enchère : &6/hdv bid <prix de départ>"
+    action:
+      type: INFO # Action spéciale qui ne fait rien au clic, juste un item d'info
+    # Pour une tête custom:
+    # action:
+    #   type: FILLER # ou INFO
+    #   extra_data:
+    #     texture: "eyJ0ZXh0dXJlcyI6eyJTS0lOIjp7InVybCI6Imh0dHA6Ly90ZXh0dXJlcy5taW5lY3JhZnQubmV0L3RleHR1cmUvMTY0MzlkMmUzMDZiMjI1NTE2YWE5YTZkMDA3YTdlNzVlZGQyZDUwMTVkMTEzYjQyZjQ0YmU2MmE1MTdlNTc0ZiJ9fX0="
+
+
+# Options spécifiques au menu
+options:
+  # Son joué à l'ouverture du menu (nom du son Bukkit)
+  open_sound: "BLOCK_CHEST_OPEN"
+  # Si la pagination est gérée par ce menu pour les items d'enchères
+  paginated_auction_items: true
+  # (D'autres options peuvent être ajoutées ici et récupérées via menuDefinition.getOption())

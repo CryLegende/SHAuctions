@@ -1,0 +1,91 @@
+# Configuration du menu de l'historique des ventes
+
+title: "&8&lHDV &8| Historique: {HistoryScope} ({currentPage}/{totalPages})"
+size: 54
+
+auction_item_slots:
+  - 10
+  - 11
+  - 12
+  - 13
+  - 14
+  - 15
+  - 16
+  - 19
+  - 20
+  - 21
+  - 22
+  - 23
+  - 24
+  - 25
+  - 28
+  - 29
+  - 30
+  - 31
+  - 32
+  - 33
+  - 34
+
+auction_item_format: # Nom générique pour la structure du format d'item
+  name: "{ItemName}"
+  lore:
+    - "{ItemLore}"
+    - "&f&m                                       &r"
+    - "&fType : &e{SaleType}"
+    - "&fVendu par : &e{SellerName}"
+    - "&fAcheté par : &e{BuyerName}"
+    - "&fPrix : &e{Price} {CurrencySymbol}"
+    - "&fDate : &e{SoldTimestamp}"
+    - "&f&m                                       &r"
+
+items:
+  '48':
+    material: ARROW
+    name: "Page Précédente"
+    action: { type: PREVIOUS_PAGE }
+
+  '49':
+    material: PAPER
+    name: "&c⤾ Retour &7(clic)"
+    action:
+      type: OPEN_MENU
+      value: "main_auction_house"
+
+  '50':
+    material: ARROW
+    name: "Page Suivante"
+    action: { type: NEXT_PAGE }
+
+  # Bouton pour basculer entre l'historique personnel et global
+  '45':
+    material: COMPARATOR
+    name: "&6Changer la Vue"
+    lore:
+      - "&7Cliquez pour basculer entre"
+      - "&7votre historique et l'historique global."
+    action:
+      type: SWITCH_HISTORY_SCOPE
+
+  # Item spécial si aucun historique
+  '-3':
+    material: PAPER
+    name: "&cAucun historique trouvé"
+    action: { type: INFO }
+
+  # Fillers...
+  '0': { material: GRAY_STAINED_GLASS_PANE, name: " ", action: { type: FILLER } }
+  '1': { material: GRAY_STAINED_GLASS_PANE, name: " ", action: { type: FILLER } }
+  '7': { material: GRAY_STAINED_GLASS_PANE, name: " ", action: { type: FILLER } }
+  '8': { material: GRAY_STAINED_GLASS_PANE, name: " ", action: { type: FILLER } }
+  '9': { material: GRAY_STAINED_GLASS_PANE, name: " ", action: { type: FILLER } }
+  '17': { material: GRAY_STAINED_GLASS_PANE, name: " ", action: { type: FILLER } }
+  # Slot 45 est maintenant utilisé
+  '46': { material: GRAY_STAINED_GLASS_PANE, name: " ", action: { type: FILLER } }
+  '47': { material: GRAY_STAINED_GLASS_PANE, name: " ", action: { type: FILLER } }
+  '51': { material: GRAY_STAINED_GLASS_PANE, name: " ", action: { type: FILLER } }
+  '52': { material: GRAY_STAINED_GLASS_PANE, name: " ", action: { type: FILLER } }
+  '53': { material: GRAY_STAINED_GLASS_PANE, name: " ", action: { type: FILLER } }
+
+
+options:
+  open_sound: "BLOCK_ENDER_CHEST_OPEN"

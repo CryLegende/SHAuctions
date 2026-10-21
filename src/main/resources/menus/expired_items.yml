@@ -1,0 +1,88 @@
+# Configuration du menu des items expirés à récupérer
+
+title: "&8&lHDV &8| Vos invendus ({currentPage}/{totalPages})"
+size: 54 # Ou la taille que vous préférez
+
+# Slots pour afficher les items expirés (réutilise la même clé que pour l'HDV)
+auction_item_slots:
+  - 10
+  - 11
+  - 12
+  - 13
+  - 14
+  - 15
+  - 16
+  - 19
+  - 20
+  - 21
+  - 22
+  - 23
+  - 24
+  - 25
+  - 28
+  - 29
+  - 30
+  - 31
+  - 32
+  - 33
+  - 34
+  # ... etc., autant de slots que vous voulez par page
+
+# Format des items expirés affichés
+auction_item_format: # On réutilise "auction_item_format" pour la structure
+  # Pas de 'material' ici, on affiche l'item réel.
+  name: "{ItemName}"
+  lore:
+    - "{ItemLore}"
+    - "&f&m                                       &r"
+    - "&7Expire le : &e{ExpiredTimestamp}"
+    - ""
+    - "&aCliquez pour récupérer cet item."
+    - "&f&m                                       &r"
+
+items:
+  # Bouton Page Précédente
+  '48':
+    material: ARROW
+    name: "&fPage Précédente"
+    action: { type: PREVIOUS_PAGE }
+
+  # Bouton Retour (vers HDV principal, par exemple)
+  '49':
+    material: PAPER # Ou BARRIER
+    name: "&c⤾ Retour &7(clic)"
+    action:
+      type: OPEN_MENU
+      value: "main_auction_house" # Nom du YML de l'HDV principal
+
+  # Bouton Page Suivante
+  '50':
+    material: ARROW
+    name: "&fPage Suivante"
+    action: { type: NEXT_PAGE }
+
+  # Item spécial si aucun item expiré (optionnel)
+  # Le slot -1 est une convention, la logique dans initializeItems() le placera.
+  # '-1':
+  #   material: GLASS_BOTTLE
+  #   name: "&cAucun item invendu"
+  #   lore:
+  #     - "&7Vous n'avez aucun item à récupérer."
+  #   action: { type: INFO } # Juste pour affichage
+
+
+  '0': { material: GRAY_STAINED_GLASS_PANE, name: " ", action: { type: FILLER } }
+  '1': { material: GRAY_STAINED_GLASS_PANE, name: " ", action: { type: FILLER } }
+  '7': { material: GRAY_STAINED_GLASS_PANE, name: " ", action: { type: FILLER } }
+  '8': { material: GRAY_STAINED_GLASS_PANE, name: " ", action: { type: FILLER } }
+  '9': { material: GRAY_STAINED_GLASS_PANE, name: " ", action: { type: FILLER } }
+  '17': { material: GRAY_STAINED_GLASS_PANE, name: " ", action: { type: FILLER } }
+  '45': { material: GRAY_STAINED_GLASS_PANE, name: " ", action: { type: FILLER } }
+  '46': { material: GRAY_STAINED_GLASS_PANE, name: " ", action: { type: FILLER } }
+  '47': { material: GRAY_STAINED_GLASS_PANE, name: " ", action: { type: FILLER } }
+  '51': { material: GRAY_STAINED_GLASS_PANE, name: " ", action: { type: FILLER } }
+  '52': { material: GRAY_STAINED_GLASS_PANE, name: " ", action: { type: FILLER } }
+  '53': { material: GRAY_STAINED_GLASS_PANE, name: " ", action: { type: FILLER } }
+
+options:
+  open_sound: "BLOCK_CHEST_OPEN"

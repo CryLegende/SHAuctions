@@ -1,0 +1,55 @@
+# Configuration du menu de confirmation d'achat
+
+title: "&8&lHDV &8| Confirmer l'achat" # Peut utiliser {ItemName}, {Price} etc. si AbstractMenu les remplace dans le titre
+size: 27 # Ou 36, selon le design
+
+# Pas de 'auction_item_slots' ou 'auction_item_format' ici, ce n'est pas un menu d'enchères.
+
+items:
+  # Item à acheter (juste pour l'affichage)
+  '13': # Au centre d'un inventaire de 27 slots
+    # Le matériau sera ignoré si action.type est DISPLAY_ITEM_TO_PURCHASE, l'item réel sera montré.
+    # Mais on peut définir un nom/lore par défaut ici qui sera remplacé.
+    material: PAPER # Placeholder, sera remplacé par l'item réel
+    name: "{ItemName}"
+    lore:
+      - "{ItemLore}"
+      - "&f&m                                       &r"
+      - "&fPrix : &e{Price} {CurrencySymbol}"
+      - "&fVendeur : &e{OwnerName}"
+      - "&fExpire dans : &e{RemainingTime}"
+      - "&f&m                                       &r"
+    action:
+      type: DISPLAY_ITEM_TO_PURCHASE # Action spéciale pour indiquer que c'est l'item à afficher
+
+  # Bouton Confirmer
+  '11':
+    material: LIME_STAINED_GLASS_PANE # Ou EMERALD_BLOCK
+    name: "&aConfirmer l'achat"
+    lore:
+      - ""
+      - "&7Prix : &e{Price} {CurrencySymbol}"
+      - ""
+      - "&8&o(( &a&oCliquez pour acheter cet item &8&o))"
+    action:
+      type: CONFIRM_PURCHASE_ACTION
+
+  # Bouton Annuler
+  '15':
+    material: RED_STAINED_GLASS_PANE # Ou REDSTONE_BLOCK
+    name: "&cAnnuler l'achat"
+    lore:
+      - "&7Retourenr au menu principal"
+    action:
+      type: CANCEL_PURCHASE_ACTION # Ou type: "OPEN_MENU" value: "main_auction_house"
+
+  # Fillers
+  '0':  { material: BLACK_STAINED_GLASS_PANE, name: " ", action: { type: FILLER } }
+  '8':  { material: BLACK_STAINED_GLASS_PANE, name: " ", action: { type: FILLER } }
+  '9':  { material: BLACK_STAINED_GLASS_PANE, name: " ", action: { type: FILLER } }
+  '17': { material: BLACK_STAINED_GLASS_PANE, name: " ", action: { type: FILLER } }
+  '18': { material: BLACK_STAINED_GLASS_PANE, name: " ", action: { type: FILLER } }
+  '26': { material: BLACK_STAINED_GLASS_PANE, name: " ", action: { type: FILLER } }
+
+options:
+  open_sound: "UI_BUTTON_CLICK" # Un son discret

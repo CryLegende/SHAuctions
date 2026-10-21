@@ -1,0 +1,146 @@
+# Messages configurables pour SHAuctions
+# Utilisez %placeholder% pour les variables dynamiques.
+# Vous pouvez utiliser les codes couleurs standards (&c, &l, etc.)
+# et les codes couleurs hexadécimaux (&#RRGGBB ou &x&R&R&G&G&B&B pour versions récentes).
+
+item_not_found: '&cL''item demandé n''est plus disponible ou n''existe pas.'
+plugin_prefix: '' # Laissé vide car le préfixe est ajouté à chaque message individuellement
+
+# Messages généraux
+reload_success: '&7&l« &a&lSH &8&l» &7Configuration rechargée &aavec succès&7.'
+reload_failure: '&7&l« &c&lSH &8&l» &7Erreur lors du rechargement de la configuration.
+  &cVérifiez la console&7.'
+no_permission: '&7&l« &c&lSH &8&l» &7Vous n''avez pas la permission d''exécuter cette
+  commande.'
+player_only_command: '&7&l« &c&lSH &8&l» &7Cette commande ne peut être exécutée que
+  par un joueur.'
+item_sold_successfully: '&7&l« &a&lSH &8&l» &7Votre item &a%item_name% &7a été vendu
+  pour &a%price% SHCoins&7.'
+item_purchased_successfully: '&7&l« &a&lSH &8&l» &7Vous avez acheté &a%item_name%
+  &7pour &a%price% &7de &a%seller%&7.'
+not_enough_money: '&7&l« &c&lSH &8&l» &7Vous n''avez pas assez d''argent pour acheter
+  cet item. Il coûte &c%price%&7.'
+inventory_full: '&7&l« &c&lSH &8&l» &7Votre inventaire est plein. &cVeuillez faire
+  de la place&7.'
+auction_cancelled_self: '&7&l« &e&lSH &8&l» &7Votre vente de &e%item_name% &7a été
+  annulée. L''item vous a été rendu.'
+auction_cancelled_admin: '&7&l« &c&lSH &8&l» &7Votre vente de &c%item_name% &7a été
+  &cannulée par un membre du staff&7. Raison : &c%reason%&7. (Ce n''est pas une expiration
+  : inutile de relister sans corriger le problème.)'
+item_returned_to_inventory: '&7&l« &a&lSH &8&l» &7L''item &a%item_name% &7vous a été
+  retourné dans votre inventaire.'
+item_sent_to_expired: '&7&l« &e&lSH &8&l» &7Votre item dans l''HDV &e%item_name% &7a
+  expiré et a été déplacé vers vos invendus.'
+cannot_buy_own_item: '&7&l« &e&lSH &8&l» &7Vous ne pouvez pas acheter votre propre
+  item.'
+item_not_found_or_expired: '&7&l« &e&lSH &8&l» &7L''item demandé n''est plus disponible
+  ou n''existe pas.'
+auction_limit_reached: '&7&l« &c&lSH &8&l» &7Vous avez atteint votre limite de &c%limit%
+  &7items en vente.' # Conforme à votre exemple
+global_auction_limit_reached: '&7&l« &c&lSH &8&l» &7L''hôtel des ventes est plein.
+  &cRéessayez plus tard&7.'
+invalid_price: '&7&l« &c&lSH &8&l» &7Le prix spécifié n''est pas valide. (Min: &c%min_price%&7,
+  Max: &c%max_price%&7).'
+invalid_duration: '&7&l« &c&lSH &8&l» &7La durée doit être comprise entre &c%min_duration%
+  &7et &c%max_duration%&7.'
+invalid_duration_format: '&7&l« &c&lSH &8&l» &7Durée invalide. Format : &cXjXhXmXs
+  &7(ex: &c1h30m&7) ou un nombre d''heures (ex: &c12&7).'
+item_blacklisted: '&7&l« &c&lSH &8&l» &7Cet item (&c%item_name%&7) ne peut pas être
+  vendu à l''hôtel des ventes.'
+enchantment_blacklisted: '&7&l« &c&lSH &8&l» &7Un ou plusieurs enchantements sur cet
+  item sont interdits à la vente.'
+must_hold_item: '&7&l« &c&lSH &8&l» &7Vous devez tenir l''item que vous souhaitez
+  vendre dans votre main.'
+no_item_in_hand: '&7&l« &c&lSH &8&l» &7Vous ne tenez aucun item dans votre main.'
+sell_usage: '&7&l« &b&lSH &8&l» &7Usage: &b/hdv sell <prix> [durée] &7(ex: &b1h30m
+  &7ou &b12 &7= 12h)'
+sell_confirmation: '&7&l« &e&lSH &8&l» &7Vous allez mettre en vente &e%item_name%
+  &7x&e%amount% &7pour &e%price% &7pendant &e%duration%&7. Confirmez avec &b/hdv confirm&7
+  ou annulez avec &b/hdv cancel sell&7.'
+item_listed_successfully: '&7&l« &a&lSH &8&l» &7Votre item &a%item_name% &7a été mis
+  en vente pour &a%price% &7pendant &a%duration%&7.'
+
+# Messages pour les GUIs (les titres de GUI ne prennent généralement pas le préfixe chat)
+gui_title_main: '&1&lHôtel des Ventes &8(&7Page %page%/%total_pages%&8)'
+gui_title_confirm_purchase: '&1&lConfirmer l''achat'
+gui_title_expired_items: '&1&lMes Items Expirés'
+gui_title_own_sales: '&1&lMes Ventes en Cours'
+gui_title_sales_history: '&1&lHistorique des Ventes'
+
+# Messages pour les items expirés
+expired_notification_on_join: '&7&l« &e&lSH &8&l» &7Vous avez &e%count% &7item(s)
+  expiré(s) à récupérer. Utilisez &b/hdv expired&7.'
+no_expired_items: '&7&l« &e&lSH &8&l» &7Vous n''avez aucun item expiré à récupérer.'
+expired_item_claimed: '&7&l« &a&lSH &8&l» &7Vous avez récupéré &a%item_name%&7.'
+expired_items_cleaned_up: '&7&l« &e&lSH &8&l» &e%count% &7items expirés anciens ont
+  été supprimés de la base de données.'
+
+# Admin
+admin_item_cancelled: '&7&l« &a&lSH &8&l» &7Vente de &a%item_name% &7pour &a%seller%
+  &7annulée. Raison : &a%reason%&7.'
+admin_force_expire_all: '&7&l« &a&lSH &8&l» &7Forcé l''expiration de tous les items.'
+
+# Avertissement anti-promotion (envoyé après chaque mise en vente / enchère)
+listing_promo_warning: '&7&l« &c&lSH &8&l» &7Rappel : l''utilisation de l''hôtel des
+  ventes à des fins de &cpublicité ou de promotion &7est &cinterdite&7.'
+
+# ==== Enchères (BID) ====
+bid_usage: '&7&l« &b&lSH &8&l» &7Usage: &b/hdv bid <prix de départ> [durée] &7(ex:
+  &b1h30m &7ou &b12 &7= 12h)'
+bid_listed_successfully: '&7&l« &a&lSH &8&l» &7Votre item &a%item_name% &7a été mis
+  aux enchères (départ &a%price%&7) pendant &a%duration%&7.'
+bid_auction_ended: '&7&l« &e&lSH &8&l» &7Cette enchère est terminée ou n''existe plus.'
+cannot_bid_own_item: '&7&l« &e&lSH &8&l» &7Vous ne pouvez pas enchérir sur votre propre
+  item.'
+already_highest_bidder: '&7&l« &e&lSH &8&l» &7Vous êtes déjà le meilleur enchérisseur.'
+bid_too_low: '&7&l« &c&lSH &8&l» &7Votre mise est trop basse. Minimum : &c%min_bid%&7.'
+bid_failed_retry: '&7&l« &c&lSH &8&l» &7Votre mise n''a pas pu être enregistrée (quelqu''un
+  a peut-être misé en même temps). &7Votre argent a été remboursé, réessayez.'
+bid_placed_successfully: '&7&l« &a&lSH &8&l» &7Mise de &a%amount% &7placée sur &a%item_name%&7.
+  Vous êtes le meilleur enchérisseur !'
+bid_outbid: '&7&l« &e&lSH &8&l» &7Vous avez été surenchéri sur &e%item_name%&7. Votre
+  mise de &e%amount% &7vous a été remboursée.'
+bid_refunded_cancel: '&7&l« &e&lSH &8&l» &7L''enchère sur &e%item_name% &7a été annulée.
+  Votre mise de &e%amount% &7vous a été remboursée.'
+bid_won: '&7&l« &a&lSH &8&l» &7Vous avez remporté &a%item_name% &7pour &a%price%&7
+  !'
+bid_won_sent_to_expired: '&7&l« &e&lSH &8&l» &7Vous avez remporté &e%item_name% &7mais
+  votre inventaire était plein : l''item a été déplacé vers vos invendus.'
+bid_sold_to_winner: '&7&l« &a&lSH &8&l» &7Votre enchère &a%item_name% &7a été remportée
+  par &a%buyer% &7pour &a%price%&7.'
+bid_limit_reached: '&7&l« &c&lSH &8&l» &7Vous avez atteint votre limite d''enchères
+  simultanées (&c%limit%&7).'
+bid_time_extended: '&7&l« &e&lSH &8&l» &7Offre de dernière seconde : l''enchère est
+  prolongée de &e%seconds%s&7.'
+
+# Annonce d''enchère (proposée après la mise en enchère, via boutons cliquables)
+announce_prompt: '&7&l« &e&lSH &8&l» &7Souhaitez-vous annoncer votre enchère à tout
+  le serveur ?'
+announce_yes_button: '&a&l[Annoncer]'
+announce_yes_hover: '&7Cliquez pour annoncer votre enchère à tout le serveur.'
+announce_no_button: '&c&l[Ignorer]'
+announce_no_hover: '&7Cliquez pour ne pas annoncer.'
+bid_announcement: '&7&l« &e&lSH &8&l» &e%player% &7met aux enchères &e%item_name%
+  &7(départ &e%price%&7) ! Faites &e/hdv &7pour enchérir.'
+announce_done: '&7&l« &a&lSH &8&l» &7Votre enchère a été annoncée à tout le serveur.'
+announce_declined: '&7&l« &e&lSH &8&l» &7Annonce ignorée.'
+announce_expired: '&7&l« &e&lSH &8&l» &7La proposition d''annonce a expiré ou n''est
+  plus valide.'
+
+# Saisie chat (enchère / raison d''annulation)
+bid_prompt: '&7&l« &e&lSH &8&l» &7Saisissez votre mise dans le chat pour &e%item_name%
+  &7(minimum &e%min_bid%&7). Tapez &cannuler &7pour annuler.'
+bid_invalid_amount: '&7&l« &c&lSH &8&l» &7Montant invalide. Saisissez un nombre, ou
+  &cannuler &7pour annuler.'
+cancel_reason_prompt: '&7&l« &e&lSH &8&l» &7Saisissez la raison de l''annulation dans
+  le chat. Tapez &cannuler &7pour abandonner.'
+cancel_reason_empty: '&7&l« &c&lSH &8&l» &7La raison ne peut pas être vide. Réessayez
+  ou tapez &cannuler&7.'
+chat_input_cancelled: '&7&l« &e&lSH &8&l» &7Saisie annulée.'
+
+# Titres (utilisés avec player.sendTitle - généralement pas de préfixe chat, couleurs vives et concises)
+titles:
+  purchase_success_title: '&aAchat Réussi!'
+  purchase_success_subtitle: '&7Vous avez acheté &a%item_name%' # Info importante en couleur de succès
+  sell_success_title: '&aItem en Vente!'
+  sell_success_subtitle: '&7Votre &a%item_name% &7est maintenant listé.' # Info importante en couleur de succès

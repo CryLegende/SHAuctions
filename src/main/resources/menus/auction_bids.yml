@@ -1,0 +1,144 @@
+# Configuration du menu des Enchères (type BID)
+# Nom du fichier (sans .yml) devient le nom du menu : "auction_bids"
+
+title: "&lEnchères &r| Hôtel des ventes ({currentPage}/{totalPages})"
+size: 54
+
+# Slots remplis dynamiquement par les enchères actives.
+auction_item_slots:
+  - 10
+  - 11
+  - 12
+  - 13
+  - 14
+  - 15
+  - 16
+  - 19
+  - 20
+  - 21
+  - 22
+  - 23
+  - 24
+  - 25
+  - 28
+  - 29
+  - 30
+  - 31
+  - 32
+  - 33
+  - 34
+
+# Format des items d'enchère. Placeholders spécifiques BID :
+# {StartingPrice}, {CurrentBid}, {HighestBidder}, {NextMinBid}, {Price} (= mise actuelle ou prix de départ)
+auction_item_format:
+  name: "{ItemName}"
+  lore:
+    - "{ItemLore}"
+    - "&f&m                                       &r"
+    - ""
+    - "&fPrix de départ : &x&F&F&E&2&5&9{StartingPrice} {CurrencySymbol}"
+    - "&fMise actuelle : &x&F&F&E&2&5&9{CurrentBid}"
+    - "&fMeilleur enchérisseur : &x&F&F&E&2&5&9{HighestBidder}"
+    - "&fMise minimale : &x&F&F&E&2&5&9{NextMinBid} {CurrencySymbol}"
+    - "&fVendeur : &x&F&F&E&2&5&9{OwnerName}"
+    - "&fSe termine dans : &x&F&F&E&2&5&9{RemainingTime}"
+    - ""
+    - "&7&o(( &e&oCliquez pour enchérir &7&o))"
+    # Ligne staff : {staff} retiré et masquée aux joueurs sans permission d'annulation.
+    - "{staff}&c&o(( Clic droit : annuler cette enchère ))"
+
+# Items fixes dans le GUI
+items:
+  '0': { material: GRAY_STAINED_GLASS_PANE, name: " ", action: { type: FILLER } }
+  '1': { material: GRAY_STAINED_GLASS_PANE, name: " ", action: { type: FILLER } }
+  '7': { material: GRAY_STAINED_GLASS_PANE, name: " ", action: { type: FILLER } }
+  '8': { material: GRAY_STAINED_GLASS_PANE, name: " ", action: { type: FILLER } }
+  '9': { material: GRAY_STAINED_GLASS_PANE, name: " ", action: { type: FILLER } }
+  '17': { material: GRAY_STAINED_GLASS_PANE, name: " ", action: { type: FILLER } }
+  '47': { material: GRAY_STAINED_GLASS_PANE, name: " ", action: { type: FILLER } }
+  '51': { material: GRAY_STAINED_GLASS_PANE, name: " ", action: { type: FILLER } }
+
+  # Bouton d'informations
+  '4':
+    material: BOOK
+    name: "&6&lEnchères"
+    lore:
+      - "&7"
+      - "&8&l« &fBienvenue dans les &6Enchères&f. Placez une"
+      - "&fmise sur un objet ; à la fin du délai, le plus"
+      - "&foffrant remporte l'objet. &8&l»"
+      - ""
+      - "&8• &fCliquez sur un objet puis saisissez votre mise"
+      - "&fdans le chat (tapez &cannuler&f pour annuler)."
+      - "&8• &fPour mettre un objet aux enchères : &6/hdv bid <prix>"
+    action:
+      type: INFO
+
+  # Bouton "Vos objets en vente" (ventes + enchères)
+  '45':
+    material: DIAMOND
+    name: "&bVos Objets en Vente"
+    lore:
+      - "&7Voir les items que vous avez mis en vente"
+      - "&7ou aux enchères."
+    action:
+      type: OPEN_MENU
+      value: "own_sales"
+    requires_permission: false
+    permission_node: "shauctions.menu.ownsales"
+
+  # Bouton "Vos invendus"
+  '46':
+    material: POISONOUS_POTATO
+    name: "&2Vos Invendus"
+    lore:
+      - "&7Récupérez vos items expirés (ventes et enchères)."
+    action:
+      type: OPEN_MENU
+      value: "expired_items"
+    requires_permission: false
+    permission_node: "shauctions.menu.expired"
+
+  # Bouton Page Précédente
+  '48':
+    material: ARROW
+    name: "&fPage Précédente"
+    lore:
+      - ""
+    action:
+      type: PREVIOUS_PAGE
+
+  # Bouton Retour aux Ventes classiques
+  '49':
+    material: PAPER
+    name: "&c⤾ Retour aux Ventes &7(clic)"
+    lore:
+      - "&7Retour à l'Hôtel des Ventes classique."
+    action:
+      type: OPEN_MENU
+      value: "main_auction_house"
+
+  # Bouton Page Suivante
+  '50':
+    material: ARROW
+    name: "&fPage Suivante"
+    lore:
+      - ""
+    action:
+      type: NEXT_PAGE
+
+  # Bouton "Historique des ventes" (ventes + enchères remportées)
+  '53':
+    material: BELL
+    name: "&x&F&F&A&7&5&1Historique des Ventes"
+    lore:
+      - "&7Voir l'historique des ventes et enchères."
+    action:
+      type: OPEN_MENU
+      value: "sales_history"
+    requires_permission: false
+    permission_node: "shauctions.menu.history"
+
+options:
+  open_sound: "BLOCK_CHEST_OPEN"
+  paginated_auction_items: true

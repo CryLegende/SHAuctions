@@ -1,0 +1,203 @@
+# ============================================================================
+#  SHAuctions — Hôtel des ventes & Enchères
+# ============================================================================
+#
+#  COMMANDES  (commande principale : /hdv, alias : /ah, /auctionhouse)
+#  ----------------------------------------------------------------------------
+#   /hdv                         Ouvre l'hôtel des ventes.
+#   /hdv sell <prix> [durée]     Met en vente directe l'item en main.
+#   /hdv bid <prix> [durée]      Met aux enchères l'item en main (alias : enchere, e).
+#                                Après la mise en enchère, deux boutons cliquables
+#                                proposent d'ANNONCER l'enchère à tout le serveur.
+#   /hdv history                 Historique des ventes ET enchères remportées.
+#   /hdv expired                 Vos invendus à récupérer (ventes et enchères).
+#   /hdv ownsales                Vos objets en vente / aux enchères en cours.
+#   /hdv reload                  Recharge config.yml, messages.yml et les menus.
+#   (Annulation staff : clic droit sur l'item dans le GUI, puis raison dans le chat.
+#    Aucun identifiant d'enchère n'est jamais exposé aux joueurs ni au staff.)
+#
+#  PERMISSIONS
+#  ----------------------------------------------------------------------------
+#   shauctions.use              Utiliser l'HDV (ouvrir, voir).           [true]
+#   shauctions.sell             Mettre des items en vente.               [true]
+#   shauctions.buy              Acheter des items.                       [true]
+#   shauctions.bid              Mettre aux enchères et miser.            [true]
+#   shauctions.menu.bids        Bouton/page Enchères.                    [true]
+#   shauctions.menu.ownsales    Bouton "Vos objets en vente".           [true]
+#   shauctions.menu.expired     Bouton "Vos invendus".                  [true]
+#   shauctions.menu.history     Bouton "Historique des ventes".         [true]
+#   shauctions.history.self     Voir son propre historique.             [true]
+#   shauctions.history.global   Voir l'historique global.               [op]
+#   shauctions.expired.claim    Réclamer ses items expirés.             [true]
+#   shauctions.cancel.self      Annuler ses propres ventes.             [true]
+#   shauctions.cancel.others    Annuler les ventes des autres (staff).  [op]
+#   shauctions.reload           Recharger la configuration.             [op]
+#
+#   Limites NUMÉRIQUES (la valeur la plus élevée l'emporte ; sinon la valeur
+#   par défaut de config.yml est utilisée) :
+#   shauctions.limit.<N>        Nb max de VENTES directes simultanées (N = 1..200).
+#   shauctions.limit.unlimited  (ou shauctions.limit.*)  Ventes illimitées.
+#   shauctions.bidlimit.<N>     Nb max d'ENCHÈRES simultanées (N = 1..200).
+#                               INDÉPENDANT des ventes directes. Ex : un joueur
+#                               avec shauctions.limit.3 (3 ventes) et aucune perm
+#                               bidlimit garde le défaut d'enchères ci-dessous (1).
+#   shauctions.bidlimit.unlimited  (ou shauctions.bidlimit.*)  Enchères illimitées.
+#
+#  PLACEHOLDERS
+#  ----------------------------------------------------------------------------
+#   Ce plugin n'a AUCUNE intégration PlaceholderAPI. Les "placeholders" sont
+#   internes :
+#     - Menus (fichiers menus/*.yml) : format accolades, ex. {ItemName}, {Price},
+#       {StartingPrice}, {CurrentBid}, {HighestBidder}, {NextMinBid},
+#       {RemainingTime}, {OwnerName}, {CurrencySymbol}, {currentPage}, {totalPages}.
+#     - Messages (messages.yml) : format pourcent, ex. %item_name%, %price%,
+#       %amount%, %player%, %seller%, %buyer%, %limit%, %min_bid%, %reason%.
+# ============================================================================
+
+# Configuration principale de SHAuctions
+
+# Base de données SQLite (sera créée dans le dossier du plugin)
+database:
+  filename: shauctions.db
+
+# Économie (via Vault)
+economy:
+  # Si true, le plugin tentera de se connecter à une économie via Vault.
+  # Si false, certaines fonctionnalités (achat/vente) pourraient être désactivées ou fonctionner différemment.
+  use_vault: true
+  # Nom de la monnaie (utilisé dans les messages, etc.)
+  currency_symbol: SHC # Vous pouvez utiliser des codes couleurs comme "&2$"
+  currency_name_singular: SHCoin
+  currency_name_plural: SHCoins
+  # Seuil (montant) à partir duquel les messages (chat) ajoutent une forme abrégée entre parenthèses.
+  # Ex: "1,000,000,000 SHC (1 Md)". Voir aussi formatting.abbreviate_* pour les menus.
+  detailed_format_threshold: 1000000
+
+# Limites des enchères
+auction_limits:
+  # Prix minimum pour mettre un item en vente
+  min_price: 500.0
+  # Prix maximum pour mettre un item en vente (0 pour illimité)
+  max_price: 1000000000
+  # Durée par défaut d'une enchère en secondes (ex: 86400 = 24 heures)
+  default_duration_seconds: 86400
+  # Durée minimale d'une enchère en secondes
+  min_duration_seconds: 60 # 1 heure
+  # Durée maximale d'une enchère en secondes
+  max_duration_seconds: 259200 # 3 jours
+  # Nombre maximum d'items qu'un joueur peut avoir en vente en même temps.
+  # Les permissions "shauctions.limit.X" outrepasse cette valeur.
+  # Si un joueur n'a aucune permission "shauctions.limit.X", cette valeur est utilisée.
+  default_max_listings_per_player: 1
+  # Nombre maximum total d'items dans l'HDV global. (0 pour illimité)
+  max_global_listings: 2000
+
+# Enchères (type BID) — page "Enchères" du menu
+bids:
+  # Prix de départ minimum d'une enchère (défaut : auction_limits.min_price si absent)
+  min_starting_price: 500.0
+  # Prix de départ maximum d'une enchère, 0 pour illimité (défaut : auction_limits.max_price si absent)
+  max_starting_price: 1000000000
+  # Incrément minimal entre deux mises successives
+  min_bid_increment: 100.0
+  # Durée par défaut d'une enchère en secondes (utilisée si aucune durée n'est précisée dans /hdv bid)
+  default_duration_seconds: 86400
+  # Nombre maximum d'enchères (type BID) qu'un joueur peut avoir simultanément.
+  # Limite SÉPARÉE des ventes directes. Les permissions "shauctions.bidlimit.X" outrepassent cette valeur.
+  # Ex: un joueur avec 3 ventes directes (shauctions.limit.3) peut avoir en plus 1 enchère par défaut.
+  default_max_bid_listings_per_player: 1
+  # Protection anti-snipe : une offre placée dans les X dernières secondes repousse la fin de l'enchère.
+  # Empêche de "voler" une enchère à la toute dernière seconde.
+  # Mettre anti_snipe_seconds à 0 pour désactiver.
+  anti_snipe_seconds: 30
+  # De combien de secondes l'enchère est prolongée quand l'anti-snipe se déclenche.
+  anti_snipe_extension_seconds: 30
+  # Texte affiché dans le lore quand aucune mise n'a encore été placée
+  no_bid_placeholder: Aucune offre
+  # Texte affiché quand il n'y a pas encore de meilleur enchérisseur
+  no_bidder_placeholder: —
+
+# Items interdits (blacklist)
+# Les joueurs ne pourront pas vendre ces items. Utilisez les noms de matériaux Bukkit.
+# Exemple: ["BEDROCK", "COMMAND_BLOCK"]
+item_blacklist:
+- COMMAND_BLOCK
+- COMMAND_BLOCK_MINECART
+- CHAIN_COMMAND_BLOCK
+- REPEATING_COMMAND_BLOCK
+- STRUCTURE_BLOCK
+- STRUCTURE_VOID
+- JIGSAW
+- BARRIER
+- LIGHT
+# - "SPAWNER" # Souvent blacklisté
+
+# Items avec enchantements interdits
+# Si un item a l'un de ces enchantements (même avec d'autres), il ne pourra pas être vendu.
+# Utilisez les clés d'enchantement Bukkit (ex: "minecraft:sharpness", "sharpness")
+# Pour l'instant, laissez vide si non utilisé, ou spécifiez des enchantements OP.
+# enchantment_blacklist: []
+
+# Options pour les items expirés
+expired_items:
+  # Combien de temps les items expirés sont conservés avant d'être supprimés définitivement (en secondes).
+  # 0 pour une suppression immédiate après expiration (non recommandé si les joueurs doivent pouvoir les récupérer).
+  # -1 pour une conservation illimitée (peut remplir la base de données).
+  # Ex: 2592000 = 30 jours
+  cleanup_after_seconds: 2592000 # 30 jours
+  # Notifier le joueur à la connexion s'il a des items expirés à récupérer.
+  notify_on_join: true
+
+# Formatage de la date et de l'heure
+# Utilisez les motifs SimpleDateFormat (https://docs.oracle.com/javase/8/docs/api/java/text/SimpleDateFormat.html)
+date_format: dd/MM/yyyy HH:mm:ss # Pour l'expiration, l'historique etc.
+time_remaining_format: # Comment afficher le temps restant (non implémenté directement ici, sera utilisé dans le code)
+  days: j
+  hours: h
+  minutes: m
+  seconds: s
+# Exemple de sortie : "2j 3h 15m 30s" ou "1h 5m"
+
+display_options:
+  # Tri des items dans l'hôtel des ventes principal, historique, etc.
+  # Valeurs possibles:
+  #   DESC (Descendant): Plus récent/cher en premier (comportement par défaut actuel pour les dates)
+  #   ASC (Ascendant): Plus ancien/moins cher en premier
+  auction_house_sort_order: DESC # Tri par list_timestamp
+  sales_history_sort_order: DESC # Tri par sold_timestamp
+  expired_items_sort_order: ASC # Tri par expiration_timestamp (pour voir les plus anciens à récupérer en premier)
+  own_sales_sort_order: DESC # Tri par list_timestamp
+
+formatting:
+  # Format pour afficher les prix. Utilise java.text.DecimalFormat.
+  # Voir: https://docs.oracle.com/javase/8/docs/api/java/text/DecimalFormat.html
+  # Exemple: "#,##0.00" -> 1,234.56 ou 0.50
+  price_format: '###,###,###'
+  # Pour les gros prix, ajouter une forme abrégée entre parenthèses dans les menus.
+  # Ex: "1,000,000,000 (1 Md)". k = millier, M = million, Md = milliard.
+  abbreviate_large_prices: true
+  # Seuil (montant) à partir duquel la forme abrégée est ajoutée.
+  abbreviate_threshold: 1000000
+
+# Tâches planifiées
+tasks:
+  # Intervalle de vérification des items expirés, en secondes.
+  expiration_check_interval_seconds: 300 # 5 minutes
+
+# Options diverses
+misc:
+  # Permettre d'annuler ses propres ventes
+  allow_self_cancel: true
+  # Permettre aux admins (permission shauctions.cancel.others) d'annuler les ventes des autres
+  allow_admin_cancel: true
+  # Logguer les transactions (achats) dans la console
+  log_transactions: true
+  # Son joué lors d'un achat réussi (vide pour aucun son)
+  # Voir: https://hub.spigotmc.org/javadocs/bukkit/org/bukkit/Sound.html
+  sound_on_purchase: ENTITY_PLAYER_LEVELUP
+  sound_on_sell: ENTITY_EXPERIENCE_ORB_PICKUP
+  sound_on_cancel: BLOCK_ANVIL_LAND
+  sound_on_expire_claim: ENTITY_ITEM_PICKUP
+
+# Préfixe du plugin dans les messages (laissé ici pour centralisation, mais sera géré par MessageManager)
+# plugin_prefix: "&8[&x&F&F&A&7&5&1SH&fAuctions&8] &r"
