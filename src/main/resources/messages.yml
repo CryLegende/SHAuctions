@@ -14,6 +14,18 @@ no_permission: '&7&l« &c&lSH &8&l» &7Vous n''avez pas la permission d''exécut
   commande.'
 player_only_command: '&7&l« &c&lSH &8&l» &7Cette commande ne peut être exécutée que
   par un joueur.'
+generic_error_occurred: '&7&l« &c&lSH &8&l» &7Une erreur est survenue (&c%error_details%&7).
+  Réessayez, ou prévenez un membre du &cstaff&7.'
+economy_disabled_error: '&7&l« &c&lSH &8&l» &7L''économie est &cindisponible &7pour
+  le moment. Réessayez plus tard.'
+no_permission_cancel: '&7&l« &c&lSH &8&l» &7Vous n''avez pas le droit d''annuler cette
+  vente.'
+item_sent_to_expired_after_cancel: '&7&l« &e&lSH &8&l» &7Votre vente de &e%item_name%
+  &7a été annulée, mais votre inventaire était plein : l''item a été déplacé vers
+  vos invendus.'
+expired_item_not_found_or_claimed: '&7&l« &e&lSH &8&l» &7Cet invendu n''existe plus
+  ou a &edéjà été récupéré&7.'
+not_your_expired_item: '&7&l« &c&lSH &8&l» &7Cet invendu ne vous appartient pas.'
 item_sold_successfully: '&7&l« &a&lSH &8&l» &7Votre item &a%item_name% &7a été vendu
   pour &a%price% SHCoins&7.'
 item_purchased_successfully: '&7&l« &a&lSH &8&l» &7Vous avez acheté &a%item_name%
@@ -132,6 +144,8 @@ bid_prompt: '&7&l« &e&lSH &8&l» &7Saisissez votre mise dans le chat pour &e%it
   &7(minimum &e%min_bid%&7). Tapez &cannuler &7pour annuler.'
 bid_invalid_amount: '&7&l« &c&lSH &8&l» &7Montant invalide. Saisissez un nombre, ou
   &cannuler &7pour annuler.'
+bid_retry_prompt: '&7&l« &e&lSH &8&l» &7Retapez une mise dans le chat, ou &cannuler
+  &7pour abandonner.'
 cancel_reason_prompt: '&7&l« &e&lSH &8&l» &7Saisissez la raison de l''annulation dans
   le chat. Tapez &cannuler &7pour abandonner.'
 cancel_reason_empty: '&7&l« &c&lSH &8&l» &7La raison ne peut pas être vide. Réessayez

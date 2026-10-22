@@ -130,4 +130,28 @@ public class ChatInputManager {
     public void cancel(UUID playerUuid) {
         pending.remove(playerUuid);
     }
+
+    /**
+     * Termine l'attente du joueur, mais seulement si c'est bien celle de ce type pour cette enchère
+     * (une autre attente prise entre-temps, par exemple sur une autre enchère, est conservée).
+     */
+    public void finish(UUID playerUuid, InputType type, long auctionId) {
+        pending.computeIfPresent(playerUuid, (uuid, input) -> matches(input, type, auctionId) ? null : input);
+    }
+
+    /**
+     * Garde l'attente active après une mise refusée et repart pour un délai complet
+     * (sans effet si l'attente a changé, ou si elle est déjà périmée).
+     */
+    public void refresh(UUID playerUuid, InputType type, long auctionId) {
+        pending.computeIfPresent(playerUuid, (uuid, input) -> {
+            if (!matches(input, type, auctionId)) return input;
+            if (System.currentTimeMillis() - input.getCreatedAtMillis() > TIMEOUT_MILLIS) return null;
+            return new PendingInput(type, auctionId);
+        });
+    }
+
+    private static boolean matches(PendingInput input, InputType type, long auctionId) {
+        return input.getType() == type && input.getAuctionId() == auctionId;
+    }
 }

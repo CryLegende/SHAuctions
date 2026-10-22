@@ -20,6 +20,7 @@ Hôtel des ventes (/hdv) : ventes directes et enchères, invendus, historique et
 - **Mêmes règles que le chat** : le montant est lu comme au chat (virgule décimale, espaces ignorés, strictement positif) puis transmis à la même méthode de mise, qui revérifie tout côté serveur : enchère encore ouverte, vendeur, meilleur enchérisseur, minimum, incrément, solde, concurrence. Les messages d'erreur sont ceux du chat. Aucun plafond n'est imposé aux gros montants (champ texte, pas de curseur).
 - **Saisie à usage unique** : chaque dialogue porte un jeton aléatoire ; un clic n'est pris en compte que si le jeton, le type de saisie et le joueur correspondent, avant expiration (`dialogues.expiration-secondes`). La saisie est annulée si le joueur se déconnecte ou si l'enchère disparaît (annulée, expirée, remportée).
 - **Repli sur le chat** : les clients plus anciens (ViaVersion donne leur version), `dialogues.actif: false` ou une API de dialogues absente gardent exactement la saisie par chat d'avant.
+- **Saisie au chat fiabilisée** : une mise refusée (trop basse, solde insuffisant, course perdue) ne ferme plus l'attente : le message d'erreur habituel s'affiche, puis le plugin redemande un montant (`bid_retry_prompt`), au lieu de laisser le montant retapé partir dans le chat public. L'attente ne se termine que sur une mise acceptée, `annuler`, l'expiration (60 s depuis la dernière tentative) ou une enchère devenue indisponible. `NaN`, `Infinity`, `0` et les négatifs sont refusés comme un montant invalide.
 
 Utilisé sur : **Opale**.
 
@@ -59,7 +60,7 @@ Fichiers par défaut repris du serveur (secrets remplacés par `CHANGE_ME`). Cli
 <pre>
 plugins/SHAuctions/
 ├── <a href="src/main/resources/config.yml">config.yml</a>        dialogues.actif, dialogues.min-protocol (771 = 1.21.6), dialogues.expiration-secondes
-├── <a href="src/main/resources/messages.yml">messages.yml</a>      section dialogues (titres, champs, boutons, erreurs) et messages dialog_*
+├── <a href="src/main/resources/messages.yml">messages.yml</a>      section dialogues (titres, champs, boutons, erreurs), messages dialog_* et bid_retry_prompt ; les clés manquantes (dont generic_error_occurred) sont ajoutées au fichier du serveur au premier démarrage
 └── menus/
     ├── <a href="src/main/resources/menus/auction_bids.yml">auction_bids.yml</a>
     ├── <a href="src/main/resources/menus/confirm_purchase.yml">confirm_purchase.yml</a>

@@ -3,6 +3,7 @@ package org.Cry_Legende.sHAuctions.listener;
 import org.Cry_Legende.sHAuctions.SHAuctions;
 import org.Cry_Legende.sHAuctions.config.MessageManager;
 import org.Cry_Legende.sHAuctions.manager.ChatInputManager;
+import org.Cry_Legende.sHAuctions.model.AuctionItem;
 
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
@@ -57,26 +58,16 @@ public class ChatInputListener implements Listener {
         final long auctionId = pending.getAuctionId();
 
         if (type == ChatInputManager.InputType.BID) {
-            double amount;
-            try {
-                amount = Double.parseDouble(raw.replace(",", ".").replace(" ", ""));
-            } catch (NumberFormatException e) {
-                // Saisie invalide : on garde l'état en attente pour permettre une nouvelle tentative.
+            final Double amount = parseAmount(raw);
+            if (amount == null) {
+                // Saisie invalide (texte, NaN, infini, nul ou négatif) : on garde l'état en attente pour une nouvelle tentative.
                 messageManager.sendMessage(player, "bid_invalid_amount");
                 return;
             }
-            if (amount <= 0) {
-                messageManager.sendMessage(player, "bid_invalid_amount");
-                return;
-            }
-            // Saisie valide : retirer l'état et traiter sur le thread principal.
-            chatInputManager.consume(player.getUniqueId());
-            final double finalAmount = amount;
-            Bukkit.getScheduler().runTask(plugin, () -> {
-                if (player.isOnline()) {
-                    plugin.getAuctionManager().placeBid(player, auctionId, finalAmount);
-                }
-            });
+            // L'attente reste active pendant le traitement : elle n'est retirée qu'une fois la mise acceptée
+            // (ou devenue impossible). Une mise refusée (trop basse, solde...) redemande, au lieu de laisser
+            // le montant retapé partir dans le chat public.
+            Bukkit.getScheduler().runTask(plugin, () -> processBid(player, auctionId, amount));
         } else if (type == ChatInputManager.InputType.CANCEL_REASON) {
             if (raw.isEmpty()) {
                 messageManager.sendMessage(player, "cancel_reason_empty");
@@ -89,6 +80,52 @@ public class ChatInputListener implements Listener {
                     plugin.getAuctionManager().cancelAuction(player, auctionId, true, reason);
                 }
             });
+        }
+    }
+
+    /**
+     * Traite une mise saisie au chat (thread principal). Mise acceptée ou devenue impossible : l'attente est retirée.
+     * Mise refusée alors que l'enchère reste ouverte au joueur : l'attente repart pour un délai complet et le joueur
+     * est invité à retaper un montant.
+     */
+    private void processBid(Player player, long auctionId, double amount) {
+        final ChatInputManager.InputType type = ChatInputManager.InputType.BID;
+        boolean retry = false;
+        try {
+            if (player.isOnline()) {
+                boolean accepted = plugin.getAuctionManager().placeBid(player, auctionId, amount);
+                retry = !accepted && canStillBid(player, auctionId);
+                if (retry) {
+                    messageManager.sendMessage(player, "bid_retry_prompt");
+                }
+            }
+        } finally {
+            if (retry) {
+                chatInputManager.refresh(player.getUniqueId(), type, auctionId);
+            } else {
+                chatInputManager.finish(player.getUniqueId(), type, auctionId);
+            }
+        }
+    }
+
+    /** L'enchère est-elle toujours ouverte à une mise de ce joueur ? (sinon inutile de continuer à attendre) */
+    private boolean canStillBid(Player player, long auctionId) {
+        AuctionItem auction = plugin.getDatabaseManager().getAuctionDAO().getAuctionById(auctionId);
+        return auction != null && auction.isBid() && !auction.isExpired()
+                && !auction.getSellerUuid().equals(player.getUniqueId())
+                && !(auction.hasBid() && player.getUniqueId().equals(auction.getHighestBidderUuid()));
+    }
+
+    /** Montant saisi : virgule décimale et espaces tolérés, fini et strictement positif (sinon null). */
+    static Double parseAmount(String raw) {
+        try {
+            double value = Double.parseDouble(raw.replace(",", ".").replace(" ", ""));
+            if (Double.isNaN(value) || Double.isInfinite(value) || value <= 0) {
+                return null;
+            }
+            return value;
+        } catch (NumberFormatException e) {
+            return null;
         }
     }
 
