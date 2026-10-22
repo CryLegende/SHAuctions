@@ -4,7 +4,7 @@
 
 # SHAuctions
 
-*Plugin du serveur SkyHand.*
+*Hôtel des ventes (/hdv) : ventes directes et enchères, invendus, historique et annulation par le staff.*
 
 <img src="https://img.shields.io/badge/Paper-26.3-f2a900?style=for-the-badge" alt="Paper 26.3"> <img src="https://img.shields.io/badge/Java-25-e76f00?style=for-the-badge" alt="Java 25"> <img src="https://img.shields.io/badge/SkyHand-Opale-3aa655?style=for-the-badge" alt="SkyHand Opale">
 
@@ -14,7 +14,7 @@
 
 ## Présentation
 
-Plugin du serveur SkyHand.
+Hôtel des ventes (/hdv) : ventes directes et enchères, invendus, historique et annulation par le staff.
 
 Utilisé sur : **Opale**.
 
@@ -49,16 +49,20 @@ Utilisé sur : **Opale**.
 
 ## Configuration
 
-Fichiers par défaut repris du serveur (secrets remplacés par `CHANGE_ME`) :
+Fichiers par défaut repris du serveur (secrets remplacés par `CHANGE_ME`). Cliquez sur un fichier pour l'ouvrir :
 
-- `config.yml`
-- `menus/auction_bids.yml`
-- `menus/confirm_purchase.yml`
-- `menus/expired_items.yml`
-- `menus/main_auction_house.yml`
-- `menus/own_sales.yml`
-- `menus/sales_history.yml`
-- `messages.yml`
+<pre>
+plugins/SHAuctions/
+├── <a href="src/main/resources/config.yml">config.yml</a>
+├── <a href="src/main/resources/messages.yml">messages.yml</a>
+└── menus/
+    ├── <a href="src/main/resources/menus/auction_bids.yml">auction_bids.yml</a>
+    ├── <a href="src/main/resources/menus/confirm_purchase.yml">confirm_purchase.yml</a>
+    ├── <a href="src/main/resources/menus/expired_items.yml">expired_items.yml</a>
+    ├── <a href="src/main/resources/menus/main_auction_house.yml">main_auction_house.yml</a>
+    ├── <a href="src/main/resources/menus/own_sales.yml">own_sales.yml</a>
+    └── <a href="src/main/resources/menus/sales_history.yml">sales_history.yml</a>
+</pre>
 
 ## Compilation
 
