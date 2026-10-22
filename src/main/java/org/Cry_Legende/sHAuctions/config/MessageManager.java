@@ -13,6 +13,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.regex.Matcher;
@@ -190,5 +191,20 @@ public class MessageManager {
 
     public String getPrefix() {
         return prefix;
+    }
+
+    /**
+     * Texte brut de messages.yml (sans préfixe ni conversion des couleurs), ou la valeur par défaut s'il manque.
+     */
+    public String getRaw(String path, String def) {
+        String value = messagesConfig.getString(path);
+        return value == null ? def : value;
+    }
+
+    /**
+     * Liste de textes bruts de messages.yml (vide si la clé n'existe pas).
+     */
+    public List<String> getRawList(String path) {
+        return messagesConfig.getStringList(path);
     }
 }

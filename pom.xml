@@ -80,6 +80,10 @@
             <id>placeholderapi</id>
             <url>https://repo.extendedclip.com/content/repositories/placeholderapi/</url>
         </repository>
+        <repository>
+            <id>viaversion-repo</id>
+            <url>https://repo.viaversion.com</url>
+        </repository>
     </repositories>
 
     <dependencies>
@@ -105,6 +109,13 @@
             <groupId>com.mojang</groupId>
             <artifactId>authlib</artifactId>
             <version>6.0.54</version>
+            <scope>provided</scope>
+        </dependency>
+        <!-- ViaVersion est facultatif : seule la classe ViaSupport s'en sert -->
+        <dependency>
+            <groupId>com.viaversion</groupId>
+            <artifactId>viaversion-api</artifactId>
+            <version>5.12.1</version>
             <scope>provided</scope>
         </dependency>
     </dependencies>

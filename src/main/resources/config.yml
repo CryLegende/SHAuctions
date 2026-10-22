@@ -13,7 +13,9 @@
 #   /hdv expired                 Vos invendus à récupérer (ventes et enchères).
 #   /hdv ownsales                Vos objets en vente / aux enchères en cours.
 #   /hdv reload                  Recharge config.yml, messages.yml et les menus.
-#   (Annulation staff : clic droit sur l'item dans le GUI, puis raison dans le chat.
+#   (Mise sur une enchère : clic gauche sur l'item dans la page Enchères, puis montant saisi dans
+#    un dialogue (clients 1.21.6+, voir « dialogues » plus bas) ou, pour les clients plus anciens, dans le chat.
+#    Annulation staff : clic droit sur l'item dans le GUI, puis raison saisie de la même façon.
 #    Aucun identifiant d'enchère n'est jamais exposé aux joueurs ni au staff.)
 #
 #  PERMISSIONS
@@ -198,6 +200,19 @@ misc:
   sound_on_sell: ENTITY_EXPERIENCE_ORB_PICKUP
   sound_on_cancel: BLOCK_ANVIL_LAND
   sound_on_expire_claim: ENTITY_ITEM_PICKUP
+
+# Saisie par dialogue natif (clients 1.21.6 et plus) : montant d'une mise et raison d'une annulation staff.
+# Les clients plus anciens (ou actif: false) gardent la saisie dans le chat, inchangée (« annuler » pour abandonner).
+# Les textes des dialogues se règlent dans messages.yml, section « dialogues ».
+# Le montant saisi est revérifié par le serveur avec les mêmes règles qu'au chat (minimum, incrément, solde...).
+dialogues:
+  # false : tous les joueurs saisissent dans le chat
+  actif: true
+  # Version de protocole minimale du client pour recevoir un dialogue (771 = 1.21.6).
+  # Sans ViaVersion, tous les clients sont considérés compatibles.
+  min-protocol: 771
+  # Durée de validité d'un dialogue ouvert, en secondes : passé ce délai, valider ne fait plus rien
+  expiration-secondes: 300
 
 # Préfixe du plugin dans les messages (laissé ici pour centralisation, mais sera géré par MessageManager)
 # plugin_prefix: "&8[&x&F&F&A&7&5&1SH&fAuctions&8] &r"

@@ -138,6 +138,41 @@ cancel_reason_empty: '&7&l« &c&lSH &8&l» &7La raison ne peut pas être vide. R
   ou tapez &cannuler&7.'
 chat_input_cancelled: '&7&l« &e&lSH &8&l» &7Saisie annulée.'
 
+# Saisie par dialogue (clients 1.21.6+) : messages envoyés dans le chat
+dialog_expired: '&7&l« &e&lSH &8&l» &7Cette saisie a &eexpiré&7. Recommencez depuis le menu.'
+dialog_auction_ended: '&7&l« &e&lSH &8&l» &7Cette enchère n''est plus disponible : saisie &eannulée&7.'
+dialog_error: '&7&l« &c&lSH &8&l» &7Une erreur est survenue pendant la saisie. Réessayez, ou prévenez un membre du &cstaff&7.'
+dialog_auction_changed: '&7&l« &e&lSH &8&l» &7Cette annonce a &echangé &7depuis l''ouverture du dialogue : saisie &eannulée&7, recommencez.'
+
+# Textes des dialogues (sans préfixe). Codes & et &#RRGGBB acceptés.
+# Variables : %item_name% %seller% %min_bid% %current_bid% %highest_bidder% %time_left% (et %max% pour la raison).
+dialogues:
+  enchere:
+    titre: '&#F9C572&lMiser sur cette enchère'
+    corps:
+      - '&7Objet : &e%item_name%'
+      - '&7Vendeur : &e%seller%'
+      - '&7Meilleure offre : &e%current_bid%'
+      - '&7Meilleur enchérisseur : &e%highest_bidder%'
+      - '&7Mise minimum : &e%min_bid%'
+      - '&7Temps restant : &e%time_left%'
+    champ: '&fVotre mise &7(ex : 2500 ou 2500,50)'
+    valider: '&a&lMiser'
+    annuler: '&c&lAnnuler'
+  annulation:
+    titre: '&c&lAnnuler cette annonce'
+    corps:
+      - '&7Objet : &e%item_name%'
+      - '&7Vendeur : &e%seller%'
+      - '&7La raison sera communiquée au vendeur.'
+    champ: '&fRaison de l''annulation &7(%max% caractères maximum)'
+    valider: '&c&lAnnuler l''annonce'
+    annuler: '&7Retour'
+  erreurs:
+    montant-invalide: '&cMontant invalide : saisissez un nombre positif (ex : 2500).'
+    raison-vide: '&cLa raison ne peut pas être vide.'
+    raison-invalide: '&cRaison invalide : %max% caractères maximum, sans caractère spécial.'
+
 # Titres (utilisés avec player.sendTitle - généralement pas de préfixe chat, couleurs vives et concises)
 titles:
   purchase_success_title: '&aAchat Réussi!'

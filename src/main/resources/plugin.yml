@@ -3,7 +3,7 @@ version: '${project.version}'
 main: org.Cry_Legende.sHAuctions.SHAuctions
 api-version: '1.20'
 author: Cry_Legende
-softdepend: [Vault] # Dépendance optionnelle pour l'économie, mais fortement recommandée
+softdepend: [Vault, ViaVersion] # Vault : économie (fortement recommandé) ; ViaVersion : version du client pour les dialogues
 
 commands:
   hdv: # Ou 'ah', 'auction', etc.

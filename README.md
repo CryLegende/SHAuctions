@@ -16,11 +16,16 @@
 
 Hôtel des ventes (/hdv) : ventes directes et enchères, invendus, historique et annulation par le staff.
 
+- **Saisie par dialogue natif** : sur un client 1.21.6 ou plus, miser sur une enchère (clic gauche dans la page Enchères) ou donner la raison d'une annulation staff (clic droit) ouvre un dialogue avec un champ de saisie et deux boutons, **Miser / Valider** et **Annuler**, à la place de « saisissez dans le chat, tapez annuler ». Échap annule proprement. Le dialogue rappelle l'objet, la meilleure offre, la mise minimum et le temps restant.
+- **Mêmes règles que le chat** : le montant est lu comme au chat (virgule décimale, espaces ignorés, strictement positif) puis transmis à la même méthode de mise, qui revérifie tout côté serveur : enchère encore ouverte, vendeur, meilleur enchérisseur, minimum, incrément, solde, concurrence. Les messages d'erreur sont ceux du chat. Aucun plafond n'est imposé aux gros montants (champ texte, pas de curseur).
+- **Saisie à usage unique** : chaque dialogue porte un jeton aléatoire ; un clic n'est pris en compte que si le jeton, le type de saisie et le joueur correspondent, avant expiration (`dialogues.expiration-secondes`). La saisie est annulée si le joueur se déconnecte ou si l'enchère disparaît (annulée, expirée, remportée).
+- **Repli sur le chat** : les clients plus anciens (ViaVersion donne leur version), `dialogues.actif: false` ou une API de dialogues absente gardent exactement la saisie par chat d'avant.
+
 Utilisé sur : **Opale**.
 
 ## Dépendances
 
-- Optionnelles : `Vault`
+- Optionnelles : `Vault`, `ViaVersion` (version du client pour choisir dialogue ou chat ; sans lui tous les clients sont considérés compatibles)
 
 ## Commandes
 
@@ -53,8 +58,8 @@ Fichiers par défaut repris du serveur (secrets remplacés par `CHANGE_ME`). Cli
 
 <pre>
 plugins/SHAuctions/
-├── <a href="src/main/resources/config.yml">config.yml</a>
-├── <a href="src/main/resources/messages.yml">messages.yml</a>
+├── <a href="src/main/resources/config.yml">config.yml</a>        dialogues.actif, dialogues.min-protocol (771 = 1.21.6), dialogues.expiration-secondes
+├── <a href="src/main/resources/messages.yml">messages.yml</a>      section dialogues (titres, champs, boutons, erreurs) et messages dialog_*
 └── menus/
     ├── <a href="src/main/resources/menus/auction_bids.yml">auction_bids.yml</a>
     ├── <a href="src/main/resources/menus/confirm_purchase.yml">confirm_purchase.yml</a>

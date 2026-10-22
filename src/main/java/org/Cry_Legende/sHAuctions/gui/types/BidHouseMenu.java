@@ -3,6 +3,7 @@ package org.Cry_Legende.sHAuctions.gui.types;
 import org.Cry_Legende.sHAuctions.SHAuctions;
 import org.Cry_Legende.sHAuctions.config.ConfigManager;
 import org.Cry_Legende.sHAuctions.database.dao.AuctionDAO;
+import org.Cry_Legende.sHAuctions.dialog.DialogManager;
 import org.Cry_Legende.sHAuctions.gui.AbstractMenu;
 import org.Cry_Legende.sHAuctions.gui.GUIManager;
 import org.Cry_Legende.sHAuctions.model.AuctionItem;
@@ -26,7 +27,8 @@ import java.util.Map;
 /**
  * Menu des enchères (type BID). Structure identique à l'HDV direct mais alimenté par les
  * annonces de type BID. Cliquer un item ne l'achète pas : cela demande au joueur de saisir
- * un montant d'enchère dans le chat (géré par ChatInputManager/ChatInputListener).
+ * un montant d'enchère : dans un dialogue pour les clients 1.21.6+ (DialogManager), sinon dans le chat
+ * (géré par ChatInputManager/ChatInputListener).
  */
 public class BidHouseMenu extends AbstractMenu {
 
@@ -200,7 +202,12 @@ public class BidHouseMenu extends AbstractMenu {
     private void handleBidItemClick(AuctionItem auctionItem, ClickType clickType) {
         if (clickType.isRightClick()) {
             if (viewer.hasPermission("shauctions.cancel.others") && !auctionItem.getSellerUuid().equals(viewer.getUniqueId())) {
-                // Annulation staff : raison saisie dans le chat.
+                // Annulation staff : raison saisie dans un dialogue (clients 1.21.6+)...
+                DialogManager dialogs = plugin.getDialogManager();
+                if (dialogs != null && dialogs.openCancelReason(viewer, auctionItem)) {
+                    return;
+                }
+                // ... sinon dans le chat.
                 plugin.getChatInputManager().awaitCancelReason(viewer.getUniqueId(), auctionItem.getId());
                 viewer.closeInventory();
                 plugin.getMessageManager().sendMessage(viewer, "cancel_reason_prompt");
@@ -217,6 +224,11 @@ public class BidHouseMenu extends AbstractMenu {
         // Clic gauche (ou tout autre clic non-staff) : enchérir. On ne peut pas enchérir sur son propre item.
         if (auctionItem.getSellerUuid().equals(viewer.getUniqueId())) {
             plugin.getMessageManager().sendMessage(viewer, "cannot_bid_own_item");
+            return;
+        }
+        // Clients 1.21.6+ : la mise se saisit dans un dialogue (mêmes vérifications dans AuctionManager#placeBid).
+        DialogManager dialogs = plugin.getDialogManager();
+        if (dialogs != null && dialogs.openBid(viewer, auctionItem)) {
             return;
         }
         // Placer le joueur en attente de saisie du montant.

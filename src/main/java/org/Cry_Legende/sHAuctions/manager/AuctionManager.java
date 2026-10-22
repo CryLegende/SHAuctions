@@ -6,6 +6,7 @@ import org.Cry_Legende.sHAuctions.config.MessageManager;
 import org.Cry_Legende.sHAuctions.database.dao.AuctionDAO;
 import org.Cry_Legende.sHAuctions.database.dao.ExpiredItemDAO;
 import org.Cry_Legende.sHAuctions.database.dao.SoldItemDAO;
+import org.Cry_Legende.sHAuctions.dialog.DialogManager;
 import org.Cry_Legende.sHAuctions.economy.EconomyProvider;
 import org.Cry_Legende.sHAuctions.event.AuctionItemCancelledEvent;
 import org.Cry_Legende.sHAuctions.event.AuctionItemExpiredEvent;
@@ -59,6 +60,16 @@ public class AuctionManager {
         this.expiredItemDAO = plugin.getDatabaseManager().getExpiredItemDAO();
         this.economyProvider = plugin.getEconomyProvider();
         this.permissionManager = plugin.getPermissionManager();
+    }
+
+    /**
+     * L'enchère n'existe plus : les saisies par dialogue qui la visaient sont annulées (sans effet sur la saisie par chat).
+     */
+    private void invalidateDialogs(long auctionId) {
+        DialogManager dialogs = plugin.getDialogManager();
+        if (dialogs != null) {
+            dialogs.invalidateAuction(auctionId);
+        }
     }
 
     private String getItemNameForMessage(ItemStack item) {
@@ -482,6 +493,7 @@ public class AuctionManager {
 
         buyer.getInventory().addItem(purchasedItemStack.clone());
         auctionDAO.removeAuction(auctionId);
+        invalidateDialogs(auctionId);
         String itemNameForMsgsAndLogs = getItemNameForMessage(purchasedItemStack);
         soldItemDAO.addSoldItem(auctionId, auctionItem.getSellerUuid(), auctionItem.getSellerName(), buyer.getUniqueId(), buyer.getName(), itemNameForMsgsAndLogs, purchasedItemStack, auctionItem.getPrice(), "SALE");
 
@@ -577,6 +589,7 @@ public class AuctionManager {
             expiredItemDAO.addExpiredItem(auctionItem.getId(), auctionItem.getSellerUuid(), auctionItem.getSellerName(), itemToReturn, System.currentTimeMillis() / 1000L, storedReason);
         }
         auctionDAO.removeAuction(auctionId);
+        invalidateDialogs(auctionId);
 
         if (isStaffCancel) {
             Map<String, String> adminPlaceholders = new HashMap<>();
@@ -624,6 +637,7 @@ public class AuctionManager {
             if (auctionItem.isBid() && auctionItem.hasBid() && auctionItem.getHighestBidderUuid() != null) {
                 if (awardBidAuction(auctionItem, itemStack)) {
                     auctionDAO.removeAuction(auctionItem.getId());
+                    invalidateDialogs(auctionItem.getId());
                     processedCount++;
                 }
                 continue;
@@ -638,6 +652,7 @@ public class AuctionManager {
 
             if (addedToExpired) {
                 auctionDAO.removeAuction(auctionItem.getId()); // Ceci est une opération DB, OK en async
+                invalidateDialogs(auctionItem.getId());
                 processedCount++;
 
                 plugin.getLogger().info(String.format("EXPIRATION: Enchère %d (%d x %s par %s) a expiré.",

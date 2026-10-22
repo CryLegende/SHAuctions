@@ -3,6 +3,7 @@ package org.Cry_Legende.sHAuctions.gui.types;
 import org.Cry_Legende.sHAuctions.SHAuctions;
 import org.Cry_Legende.sHAuctions.config.ConfigManager;
 import org.Cry_Legende.sHAuctions.database.dao.AuctionDAO;
+import org.Cry_Legende.sHAuctions.dialog.DialogManager;
 import org.Cry_Legende.sHAuctions.gui.AbstractMenu;
 import org.Cry_Legende.sHAuctions.gui.GUIManager;
 import org.Cry_Legende.sHAuctions.model.AuctionItem;
@@ -201,7 +202,11 @@ public class AuctionHouseMenu extends AbstractMenu {
             guiManager.openConfirmPurchaseMenu(viewer, auctionItem.getId());
         } else if (clickType.isRightClick()) {
             if (viewer.hasPermission("shauctions.cancel.others") && !auctionItem.getSellerUuid().equals(viewer.getUniqueId())) {
-                // Annulation staff : demander la raison dans le chat (aucun ID exposé).
+                // Annulation staff : raison saisie dans un dialogue (clients 1.21.6+) ou, sinon, dans le chat (aucun ID exposé).
+                DialogManager dialogs = plugin.getDialogManager();
+                if (dialogs != null && dialogs.openCancelReason(viewer, auctionItem)) {
+                    return;
+                }
                 plugin.getChatInputManager().awaitCancelReason(viewer.getUniqueId(), auctionItem.getId());
                 viewer.closeInventory();
                 plugin.getMessageManager().sendMessage(viewer, "cancel_reason_prompt");

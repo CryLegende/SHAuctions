@@ -5,6 +5,8 @@ import org.Cry_Legende.sHAuctions.config.ConfigManager;
 import org.Cry_Legende.sHAuctions.config.MenuConfigManager;
 import org.Cry_Legende.sHAuctions.config.MessageManager;
 import org.Cry_Legende.sHAuctions.database.DatabaseManager;
+import org.Cry_Legende.sHAuctions.dialog.DialogListener;
+import org.Cry_Legende.sHAuctions.dialog.DialogManager;
 import org.Cry_Legende.sHAuctions.economy.EconomyProvider;
 import org.Cry_Legende.sHAuctions.gui.AbstractMenu; // Import pour le cast
 import org.Cry_Legende.sHAuctions.gui.GUIManager;
@@ -43,6 +45,8 @@ public class SHAuctions extends JavaPlugin {
     private GUIManager guiManager;
     private PermissionManager permissionManager;
     private ChatInputManager chatInputManager;
+    // null si l'API des dialogues est absente du serveur (saisie par chat uniquement)
+    private DialogManager dialogManager;
     private ExpirationTask expirationTask;
     private MenuRefreshListener menuRefreshListener;
     private RealTimeLoreUpdateTask realTimeLoreUpdateTask;
@@ -111,6 +115,7 @@ public class SHAuctions extends JavaPlugin {
         pm.registerEvents(new InventoryClickListener(this), this);
         pm.registerEvents(new PlayerJoinListener(this), this);
         pm.registerEvents(new ChatInputListener(this), this);
+        registerDialogs(pm);
         menuRefreshListener = new MenuRefreshListener(this);
         pm.registerEvents(menuRefreshListener, this);
         getLogger().info("Listeners registered.");
@@ -141,6 +146,10 @@ public class SHAuctions extends JavaPlugin {
     @Override
     public void onDisable() {
         PluginDescriptionFile pdf = getDescription();
+
+        if (dialogManager != null) {
+            dialogManager.shutdown();
+        }
         getLogger().info("------------------------------------");
         getLogger().info(ChatColor.RED + pdf.getName() + " disabling...");
 
@@ -177,6 +186,23 @@ public class SHAuctions extends JavaPlugin {
         getLogger().info(ChatColor.RED + pdf.getName() + " has been disabled.");
         getLogger().info("------------------------------------");
         instance = null;
+    }
+
+    /**
+     * Saisie par dialogue natif (1.21.6+). Si l'API des dialogues n'existe pas sur ce serveur, le plugin garde la saisie
+     * par chat : un dialogue n'est jamais indispensable.
+     */
+    private void registerDialogs(PluginManager pm) {
+        try {
+            DialogManager manager = new DialogManager(this);
+            pm.registerEvents(new DialogListener(this, manager), this);
+            dialogManager = manager;
+            getLogger().info("Saisie par dialogue prête (clients 1.21.6 et plus ; actif: "
+                + configManager.getBoolean("dialogues.actif", true) + ").");
+        } catch (RuntimeException | LinkageError e) {
+            dialogManager = null;
+            getLogger().log(Level.WARNING, "API des dialogues indisponible : saisie par chat uniquement.", e);
+        }
     }
 
     private boolean loadConfigurations() {
@@ -232,5 +258,12 @@ public class SHAuctions extends JavaPlugin {
 
     public ChatInputManager getChatInputManager() {
         return chatInputManager;
+    }
+
+    /**
+     * Gestionnaire de saisie par dialogue, ou null si l'API des dialogues est indisponible.
+     */
+    public DialogManager getDialogManager() {
+        return dialogManager;
     }
 }
