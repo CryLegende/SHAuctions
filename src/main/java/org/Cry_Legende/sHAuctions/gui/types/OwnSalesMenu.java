@@ -31,6 +31,8 @@ public class OwnSalesMenu extends AbstractMenu {
     private final AuctionManager auctionManager;
     private final ConfigManager configManager;
     private List<AuctionItem> currentOwnSalesPageItems; // Garder private, accessible via getter
+    // Liste lue par preparePageData et réutilisée par initializeItems (une seule requête par affichage)
+    private List<AuctionItem> allOwnSales = new ArrayList<>();
 
     public OwnSalesMenu(SHAuctions plugin, GUIManager guiManager, Player viewer) {
         super(plugin, guiManager, "own_sales", viewer);
@@ -53,7 +55,7 @@ public class OwnSalesMenu extends AbstractMenu {
             return;
         }
         // Le DAO getAuctionsBySeller est déjà trié par la config display_options.own_sales_sort_order
-        List<AuctionItem> allOwnSales = auctionDAO.getAuctionsBySeller(viewer.getUniqueId());
+        allOwnSales = auctionDAO.getAuctionsBySeller(viewer.getUniqueId());
         List<Integer> displaySlots = menuDefinition.getAuctionItemSlots(); // Réutilise "auction_item_slots" du YML
         int itemsPerPage = (displaySlots != null && !displaySlots.isEmpty()) ? displaySlots.size() : 1;
         if (itemsPerPage == 0) itemsPerPage = 1;
@@ -68,7 +70,7 @@ public class OwnSalesMenu extends AbstractMenu {
             return;
         }
 
-        List<AuctionItem> allOwnSales = auctionDAO.getAuctionsBySeller(viewer.getUniqueId()); // Re-fetch pour la pagination
+        // allOwnSales vient d'être lue par preparePageData (appelée juste avant par open())
         List<Integer> displaySlots = menuDefinition.getAuctionItemSlots();
 
         if (displaySlots == null || displaySlots.isEmpty()) {
@@ -78,9 +80,9 @@ public class OwnSalesMenu extends AbstractMenu {
             int startIndex = (this.currentPage - 1) * itemsPerPage;
             int endIndex = Math.min(startIndex + itemsPerPage, allOwnSales.size());
 
-            this.currentOwnSalesPageItems.clear(); // Vider avant de repeupler
+            this.currentOwnSalesPageItems = new ArrayList<>(); // Vider avant de repeupler
             if (startIndex < allOwnSales.size() && startIndex <= endIndex) { // S'assurer que subList est valide
-                this.currentOwnSalesPageItems = allOwnSales.subList(startIndex, endIndex);
+                this.currentOwnSalesPageItems = new ArrayList<>(allOwnSales.subList(startIndex, endIndex));
             }
 
             GuiItemDefinition ownSaleItemFormat = menuDefinition.getAuctionItemFormat(); // Réutilise "auction_item_format"

@@ -85,7 +85,8 @@ public class BidCommand implements SubCommand {
             return;
         }
 
-        if (startingPrice <= 0) {
+        // NaN passerait toutes les comparaisons (n'importe quelle mise serait acceptée), l'infini rendrait l'enchère impossible
+        if (startingPrice <= 0 || !Double.isFinite(startingPrice)) {
             messageManager.sendMessage(player, "invalid_price", Map.of(
                 "min_price", String.valueOf(configManager.getDouble("bids.min_starting_price", configManager.getDouble("auction_limits.min_price"))),
                 "max_price", String.valueOf(configManager.getDouble("bids.max_starting_price", configManager.getDouble("auction_limits.max_price")))

@@ -86,7 +86,8 @@ public class SellCommand implements SubCommand {
             return;
         }
 
-        if (price <= 0) { // Une vérification supplémentaire, AuctionManager fera le min_price
+        // NaN et l'infini passent les comparaisons min/max : annonce invendable
+        if (price <= 0 || !Double.isFinite(price)) { // Une vérification supplémentaire, AuctionManager fera le min_price
             messageManager.sendMessage(player, "invalid_price", Map.of(
                 "min_price", String.valueOf(configManager.getDouble("auction_limits.min_price")),
                 "max_price", String.valueOf(configManager.getDouble("auction_limits.max_price"))

@@ -29,6 +29,8 @@ public class ExpiredItemsMenu extends AbstractMenu {
     private final ExpiredItemDAO expiredItemDAO;
     private final AuctionManager auctionManager;
     private List<ExpiredItem> currentExpiredPageItems; // Garder private, accessible via getter
+    // Liste lue par preparePageData et réutilisée par initializeItems (une seule requête par affichage)
+    private List<ExpiredItem> allUnclaimedItems = new ArrayList<>();
 
     public ExpiredItemsMenu(SHAuctions plugin, GUIManager guiManager, Player viewer) {
         super(plugin, guiManager, "expired_items", viewer);
@@ -49,7 +51,7 @@ public class ExpiredItemsMenu extends AbstractMenu {
             this.currentPage = 1;
             return;
         }
-        List<ExpiredItem> allUnclaimedItems = expiredItemDAO.getUnclaimedExpiredItemsByOwner(viewer.getUniqueId());
+        allUnclaimedItems = expiredItemDAO.getUnclaimedExpiredItemsByOwner(viewer.getUniqueId());
         List<Integer> displaySlots = menuDefinition.getAuctionItemSlots();
         int itemsPerPage = (displaySlots != null && !displaySlots.isEmpty()) ? displaySlots.size() : 1;
         if (itemsPerPage == 0) itemsPerPage = 1;
@@ -64,7 +66,7 @@ public class ExpiredItemsMenu extends AbstractMenu {
             return;
         }
 
-        List<ExpiredItem> allUnclaimedItems = expiredItemDAO.getUnclaimedExpiredItemsByOwner(viewer.getUniqueId());
+        // allUnclaimedItems vient d'être lue par preparePageData (appelée juste avant par open())
         List<Integer> displaySlots = menuDefinition.getAuctionItemSlots();
 
         if (displaySlots == null || displaySlots.isEmpty()) {
@@ -74,9 +76,9 @@ public class ExpiredItemsMenu extends AbstractMenu {
             int startIndex = (this.currentPage - 1) * itemsPerPage;
             int endIndex = Math.min(startIndex + itemsPerPage, allUnclaimedItems.size());
 
-            this.currentExpiredPageItems.clear();
+            this.currentExpiredPageItems = new ArrayList<>();
             if (startIndex < allUnclaimedItems.size() && startIndex <= endIndex) {
-                this.currentExpiredPageItems = allUnclaimedItems.subList(startIndex, endIndex);
+                this.currentExpiredPageItems = new ArrayList<>(allUnclaimedItems.subList(startIndex, endIndex));
             }
 
             GuiItemDefinition expiredItemFormat = menuDefinition.getAuctionItemFormat();

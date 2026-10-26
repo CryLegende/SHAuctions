@@ -28,6 +28,9 @@ public class MessageManager {
 
     // Pour les placeholders spécifiques aux messages (non ceux des items de GUI)
     private final Pattern placeholderPattern = Pattern.compile("%([^%]+)%");
+    // Compilés une fois : translateColors est appelée pour chaque ligne de chaque menu
+    private static final Pattern HEX_PATTERN = Pattern.compile("&#([A-Fa-f0-9]{6})");
+    private static final Pattern LEGACY_HEX_PATTERN = Pattern.compile("&x(&[A-Fa-f0-9]){6}");
 
 
     public MessageManager(SHAuctions plugin) {
@@ -163,18 +166,17 @@ public class MessageManager {
         message = ChatColor.translateAlternateColorCodes('&', message);
 
         // Support des codes couleurs hexadécimaux #RRGGBB (depuis 1.16+)
-        Pattern hexPattern = Pattern.compile("&#([A-Fa-f0-9]{6})");
-        Matcher matcher = hexPattern.matcher(message);
+        // (ChatColor.valueOf de Bukkit ne connaît que les 22 couleurs nommées : le code restait affiché tel quel)
+        Matcher matcher = HEX_PATTERN.matcher(message);
         while (matcher.find()) {
             try {
-                message = message.replace(matcher.group(), ChatColor.valueOf(matcher.group(1)).toString());
+                message = message.replace(matcher.group(), net.md_5.bungee.api.ChatColor.of("#" + matcher.group(1)).toString());
             } catch (Exception e) {
                 // Ignorer si le code hex n'est pas valide, ou si sur une version < 1.16
             }
         }
         // Support des codes couleurs hexadécimaux &x&R&R&G&G&B&B (format commun)
-        Pattern legacyHexPattern = Pattern.compile("&x(&[A-Fa-f0-9]){6}");
-        matcher = legacyHexPattern.matcher(message);
+        matcher = LEGACY_HEX_PATTERN.matcher(message);
         while (matcher.find()) {
             try {
                 String hexString = matcher.group().replace("&x", "").replace("&", "");

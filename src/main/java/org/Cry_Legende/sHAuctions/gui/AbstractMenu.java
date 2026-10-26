@@ -1,6 +1,7 @@
 package org.Cry_Legende.sHAuctions.gui;
 
 import org.Cry_Legende.sHAuctions.SHAuctions;
+import org.Cry_Legende.sHAuctions.config.ConfigManager;
 import org.Cry_Legende.sHAuctions.config.MenuConfigManager;
 import org.Cry_Legende.sHAuctions.config.MessageManager;
 import org.Cry_Legende.sHAuctions.model.GuiItemDefinition;
@@ -93,10 +94,10 @@ public abstract class AbstractMenu implements InventoryHolder {
         if (playOpenSound) {
             String openSoundName = menuDefinition.getOption("open_sound", "");
             if (!openSoundName.isEmpty() && !openSoundName.equalsIgnoreCase("NONE")) {
-                try {
-                    Sound openSound = Sound.valueOf(openSoundName.toUpperCase());
+                Sound openSound = ConfigManager.sound(openSoundName);
+                if (openSound != null) {
                     viewer.playSound(viewer.getLocation(), openSound, 1.0f, 1.0f);
-                } catch (IllegalArgumentException e) {
+                } else {
                     plugin.getLogger().warning("Invalid open_sound '" + openSoundName + "' for menu '" + menuName + "'.");
                 }
             }

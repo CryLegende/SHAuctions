@@ -232,7 +232,10 @@ public class AuctionManager {
         if (auctionDbId != -1) {
             ItemStack originalItemToRemove = itemInHand.clone();
             originalItemToRemove.setAmount(itemToSell.getAmount());
-            seller.getInventory().removeItem(originalItemToRemove);
+            if (!removeListedItem(seller, originalItemToRemove, auctionDbId)) {
+                messageManager.sendMessage(seller, "generic_error_occurred", Collections.singletonMap("error_details", "Item could not be removed from inventory."));
+                return false;
+            }
             String itemNameForLogAndMsg = getItemNameForMessage(itemToSell);
             Map<String, String> placeholders = new HashMap<>();
             placeholders.put("item_name", itemNameForLogAndMsg);
@@ -310,7 +313,10 @@ public class AuctionManager {
         if (auctionDbId != -1) {
             ItemStack originalItemToRemove = itemInHand.clone();
             originalItemToRemove.setAmount(itemToSell.getAmount());
-            seller.getInventory().removeItem(originalItemToRemove);
+            if (!removeListedItem(seller, originalItemToRemove, auctionDbId)) {
+                messageManager.sendMessage(seller, "generic_error_occurred", Collections.singletonMap("error_details", "Item could not be removed from inventory."));
+                return false;
+            }
             String itemNameForLogAndMsg = getItemNameForMessage(itemToSell);
             Map<String, String> placeholders = new HashMap<>();
             placeholders.put("item_name", itemNameForLogAndMsg);
@@ -446,7 +452,8 @@ public class AuctionManager {
 
     public boolean purchaseAuction(Player buyer, long auctionId) {
         AuctionItem auctionItem = auctionDAO.getAuctionById(auctionId);
-        if (auctionItem == null) {
+        // Une enchère ne s'achète pas au prix de départ (l'offre en séquestre ne serait jamais rendue).
+        if (auctionItem == null || auctionItem.isBid()) {
             messageManager.sendMessage(buyer, "item_not_found");
             return false;
         }
@@ -491,9 +498,20 @@ public class AuctionManager {
             return false;
         }
 
-        buyer.getInventory().addItem(purchasedItemStack.clone());
-        auctionDAO.removeAuction(auctionId);
+        // L'annonce n'est retirée qu'une fois : si elle a déjà disparu (ou erreur base), les deux virements
+        // sont annulés et rien n'est donné (sinon objet livré ET toujours en vente).
+        if (!auctionDAO.removeAuction(auctionId)) {
+            if (!economyProvider.withdraw(seller, auctionItem.getPrice())) {
+                plugin.getLogger().severe("Critical error: auction " + auctionId + " could not be removed and " + economyProvider.formatCurrency(auctionItem.getPrice())
+                    + " could not be taken back from seller " + seller.getUniqueId() + ". Manual check needed.");
+            }
+            economyProvider.deposit(buyer, auctionItem.getPrice());
+            plugin.getLogger().warning("Purchase of auction " + auctionId + " by " + buyer.getName() + " aborted: auction already removed or database error. Both transfers were reverted.");
+            messageManager.sendMessage(buyer, "item_not_found");
+            return false;
+        }
         invalidateDialogs(auctionId);
+        giveOrDrop(buyer, purchasedItemStack.clone());
         String itemNameForMsgsAndLogs = getItemNameForMessage(purchasedItemStack);
         soldItemDAO.addSoldItem(auctionId, auctionItem.getSellerUuid(), auctionItem.getSellerName(), buyer.getUniqueId(), buyer.getName(), itemNameForMsgsAndLogs, purchasedItemStack, auctionItem.getPrice(), "SALE");
 
@@ -561,6 +579,14 @@ public class AuctionManager {
         boolean isStaffCancel = isAdminCancel && !auctionItem.getSellerUuid().equals(canceller.getUniqueId());
         String storedReason = isStaffCancel ? reason : null;
 
+        // Retirer l'annonce avant tout remboursement ou restitution : une annonce déjà retirée
+        // (achat, expiration, double clic, erreur base) ne rembourse ni ne rend rien une seconde fois.
+        if (!auctionDAO.removeAuction(auctionId)) {
+            messageManager.sendMessage(canceller, "item_not_found");
+            return false;
+        }
+        invalidateDialogs(auctionId);
+
         // Rembourser le meilleur enchérisseur si c'est une enchère avec offre en cours (escrow).
         if (auctionItem.isBid() && auctionItem.hasBid() && auctionItem.getHighestBidderUuid() != null) {
             OfflinePlayer prevBidder = Bukkit.getOfflinePlayer(auctionItem.getHighestBidderUuid());
@@ -579,17 +605,16 @@ public class AuctionManager {
         if (!isStaffCancel && sellerOffline.isOnline() && sellerOffline.getPlayer() != null) {
             Player sellerOnline = sellerOffline.getPlayer();
             if (sellerOnline.getInventory().firstEmpty() != -1) {
-                sellerOnline.getInventory().addItem(itemToReturn.clone());
+                giveOrDrop(sellerOnline, itemToReturn.clone());
                 itemReturnedDirectly = true;
                 messageManager.sendMessage(sellerOnline, "auction_cancelled_self", Collections.singletonMap("item_name", itemNameForMsgsAndLogs));
                 playSound(sellerOnline, configManager.getString("misc.sound_on_cancel"));
             }
         }
-        if (!itemReturnedDirectly) {
-            expiredItemDAO.addExpiredItem(auctionItem.getId(), auctionItem.getSellerUuid(), auctionItem.getSellerName(), itemToReturn, System.currentTimeMillis() / 1000L, storedReason);
+        if (!itemReturnedDirectly
+            && !expiredItemDAO.addExpiredItem(auctionItem.getId(), auctionItem.getSellerUuid(), auctionItem.getSellerName(), itemToReturn, System.currentTimeMillis() / 1000L, storedReason)) {
+            rescueItem(auctionItem.getSellerUuid(), itemToReturn, auctionId);
         }
-        auctionDAO.removeAuction(auctionId);
-        invalidateDialogs(auctionId);
 
         if (isStaffCancel) {
             Map<String, String> adminPlaceholders = new HashMap<>();
@@ -635,9 +660,8 @@ public class AuctionManager {
             // Cas d'une enchère remportée : attribuer l'item au gagnant et payer le vendeur.
             // L'argent du gagnant a déjà été prélevé au moment de l'offre (escrow).
             if (auctionItem.isBid() && auctionItem.hasBid() && auctionItem.getHighestBidderUuid() != null) {
+                // awardBidAuction retire lui-même l'enchère (avant de livrer) : pas de double attribution.
                 if (awardBidAuction(auctionItem, itemStack)) {
-                    auctionDAO.removeAuction(auctionItem.getId());
-                    invalidateDialogs(auctionItem.getId());
                     processedCount++;
                 }
                 continue;
@@ -651,7 +675,11 @@ public class AuctionManager {
             boolean addedToExpired = expiredItemDAO.addExpiredItem(auctionItem.getId(), auctionItem.getSellerUuid(), auctionItem.getSellerName(), finalItemStack, auctionItem.getExpireTimestamp());
 
             if (addedToExpired) {
-                auctionDAO.removeAuction(auctionItem.getId()); // Ceci est une opération DB, OK en async
+                if (!auctionDAO.removeAuction(auctionItem.getId())) {
+                    // L'objet est déjà dans les invendus ; l'annonce expirée reste invisible et la contrainte
+                    // UNIQUE (original_auction_id) empêche une seconde copie au prochain passage.
+                    plugin.getLogger().warning("Expired auction ID " + auctionItem.getId() + " was moved to expired items but could not be removed from auctions.");
+                }
                 invalidateDialogs(auctionItem.getId());
                 processedCount++;
 
@@ -694,11 +722,11 @@ public class AuctionManager {
 
     /**
      * Attribue une enchère remportée : paie le vendeur (l'argent du gagnant est déjà en escrow),
-     * enregistre la vente et remet l'item au gagnant (directement s'il est en ligne avec de la place,
-     * sinon dans ses invendus). Exécuté depuis le thread d'expiration (async) — les opérations DB/économie
-     * y sont sûres ; les notifications/inventaire sont planifiées sur le thread principal.
+     * retire l'enchère, enregistre la vente et remet l'item au gagnant (directement s'il est en ligne avec
+     * de la place, sinon dans ses invendus). Exécuté sur le thread principal (ExpirationTask) : la livraison
+     * se fait tout de suite, sans tâche différée qu'un arrêt du serveur pourrait perdre.
      *
-     * @return true si l'attribution a réussi (l'enchère peut être retirée).
+     * @return true si l'attribution a réussi (l'enchère a été retirée).
      */
     private boolean awardBidAuction(AuctionItem auction, ItemStack itemStack) {
         final double winningBid = auction.getHighestBid();
@@ -712,45 +740,56 @@ public class AuctionManager {
             plugin.getLogger().severe("Failed to deposit winning bid to seller for bid auction " + auction.getId() + ". Will retry next cycle.");
             return false;
         }
+        // Retirer l'enchère avant de livrer : si elle a déjà disparu (ou erreur base), on reprend le paiement
+        // et on réessaiera au prochain passage, sans jamais livrer deux fois.
+        if (!auctionDAO.removeAuction(auction.getId())) {
+            if (!economyProvider.withdraw(seller, winningBid)) {
+                plugin.getLogger().severe("Critical error: bid auction " + auction.getId() + " could not be removed and the payment of "
+                    + economyProvider.formatCurrency(winningBid) + " could not be taken back from seller " + auction.getSellerUuid() + ". Manual check needed.");
+            }
+            plugin.getLogger().warning("Bid auction " + auction.getId() + " could not be removed from auctions. Will retry next cycle.");
+            return false;
+        }
+        invalidateDialogs(auction.getId());
 
         // Enregistrer dans l'historique des ventes.
         soldItemDAO.addSoldItem(auction.getId(), auction.getSellerUuid(), auction.getSellerName(), winnerUuid, winnerName, itemName, itemStack, winningBid, "BID");
 
-        // Remettre l'item au gagnant (thread principal) ; sinon dans ses invendus.
+        // Remettre l'item au gagnant ; sinon dans ses invendus.
         final ItemStack winnerItem = itemStack.clone();
         final AuctionItem snapshot = new AuctionItem(auction.getId(), auction.getSellerUuid(), auction.getSellerName(), itemStack.clone(), winningBid, auction.getListTimestamp(), auction.getExpireTimestamp(), AuctionItem.TYPE_BID, winningBid, winnerUuid, winnerName);
         final long originalId = auction.getId();
 
-        Bukkit.getScheduler().runTask(plugin, () -> {
-            OfflinePlayer winner = Bukkit.getOfflinePlayer(winnerUuid);
-            boolean givenDirectly = false;
-            if (winner.isOnline() && winner.getPlayer() != null && winner.getPlayer().getInventory().firstEmpty() != -1) {
-                winner.getPlayer().getInventory().addItem(winnerItem.clone());
-                givenDirectly = true;
-                Map<String, String> ph = new HashMap<>();
-                ph.put("item_name", itemName);
-                ph.put("price", economyProvider.formatCurrency(winningBid));
-                messageManager.sendMessage(winner.getPlayer(), "bid_won", ph);
-                playSound(winner.getPlayer(), configManager.getString("misc.sound_on_purchase"));
+        OfflinePlayer winner = Bukkit.getOfflinePlayer(winnerUuid);
+        boolean givenDirectly = false;
+        if (winner.isOnline() && winner.getPlayer() != null && winner.getPlayer().getInventory().firstEmpty() != -1) {
+            giveOrDrop(winner.getPlayer(), winnerItem.clone());
+            givenDirectly = true;
+            Map<String, String> ph = new HashMap<>();
+            ph.put("item_name", itemName);
+            ph.put("price", economyProvider.formatCurrency(winningBid));
+            messageManager.sendMessage(winner.getPlayer(), "bid_won", ph);
+            playSound(winner.getPlayer(), configManager.getString("misc.sound_on_purchase"));
+        }
+        if (!givenDirectly) {
+            // Déposer dans les invendus du GAGNANT (owner = gagnant) pour récupération ultérieure.
+            if (!expiredItemDAO.addExpiredItem(originalId, winnerUuid, winnerName, winnerItem, System.currentTimeMillis() / 1000L)) {
+                rescueItem(winnerUuid, winnerItem, originalId);
             }
-            if (!givenDirectly) {
-                // Déposer dans les invendus du GAGNANT (owner = gagnant) pour récupération ultérieure.
-                expiredItemDAO.addExpiredItem(originalId, winnerUuid, winnerName, winnerItem, System.currentTimeMillis() / 1000L);
-                if (winner.isOnline() && winner.getPlayer() != null) {
-                    messageManager.sendMessage(winner.getPlayer(), "bid_won_sent_to_expired", Collections.singletonMap("item_name", itemName));
-                }
+            if (winner.isOnline() && winner.getPlayer() != null) {
+                messageManager.sendMessage(winner.getPlayer(), "bid_won_sent_to_expired", Collections.singletonMap("item_name", itemName));
             }
-            // Notifier le vendeur.
-            if (seller.isOnline() && seller.getPlayer() != null) {
-                Map<String, String> ph = new HashMap<>();
-                ph.put("item_name", itemName);
-                ph.put("price", economyProvider.formatCurrency(winningBid));
-                ph.put("buyer", winnerName != null ? winnerName : "?");
-                messageManager.sendMessage(seller.getPlayer(), "bid_sold_to_winner", ph);
-                playSound(seller.getPlayer(), configManager.getString("misc.sound_on_sell"));
-            }
-            Bukkit.getServer().getPluginManager().callEvent(new AuctionItemPurchasedEvent(snapshot, winner.getPlayer()));
-        });
+        }
+        // Notifier le vendeur.
+        if (seller.isOnline() && seller.getPlayer() != null) {
+            Map<String, String> ph = new HashMap<>();
+            ph.put("item_name", itemName);
+            ph.put("price", economyProvider.formatCurrency(winningBid));
+            ph.put("buyer", winnerName != null ? winnerName : "?");
+            messageManager.sendMessage(seller.getPlayer(), "bid_sold_to_winner", ph);
+            playSound(seller.getPlayer(), configManager.getString("misc.sound_on_sell"));
+        }
+        Bukkit.getServer().getPluginManager().callEvent(new AuctionItemPurchasedEvent(snapshot, winner.getPlayer()));
 
         plugin.getLogger().info(String.format("ENCHÈRE REMPORTÉE: %s remporte %d x %s pour %s (vendeur %s, ID %d).",
             winnerName, itemStack.getAmount(), itemName, economyProvider.formatCurrency(winningBid), auction.getSellerName(), auction.getId()));
@@ -781,7 +820,7 @@ public class AuctionManager {
 
         // Marquer d'abord (UPDATE conditionnel) : si la base échoue, l'item n'est pas donné
         if (expiredItemDAO.markAsClaimed(expiredItemId)) {
-            player.getInventory().addItem(itemStack.clone());
+            giveOrDrop(player, itemStack.clone());
             String itemNameForMsgsAndLogs = getItemNameForMessage(itemStack);
             messageManager.sendMessage(player, "expired_item_claimed", Collections.singletonMap("item_name", itemNameForMsgsAndLogs));
             playSound(player, configManager.getString("misc.sound_on_expire_claim"));
@@ -812,11 +851,61 @@ public class AuctionManager {
 
     private void playSound(Player player, String soundName) {
         if (soundName == null || soundName.trim().isEmpty() || "NONE".equalsIgnoreCase(soundName)) return;
-        try {
-            Sound sound = Sound.valueOf(soundName.toUpperCase());
+        Sound sound = ConfigManager.sound(soundName);
+        if (sound != null) {
             player.playSound(player.getLocation(), sound, 1.0f, 1.0f);
-        } catch (IllegalArgumentException e) {
+        } else {
             plugin.getLogger().warning("Invalid sound name in config: " + soundName);
+        }
+    }
+
+    /**
+     * Donne l'objet au joueur ; ce qui ne rentre pas tombe à ses pieds au lieu d'être perdu.
+     */
+    private void giveOrDrop(Player player, ItemStack item) {
+        for (ItemStack leftover : player.getInventory().addItem(item).values()) {
+            player.getWorld().dropItemNaturally(player.getLocation(), leftover);
+        }
+    }
+
+    /**
+     * Retire de l'inventaire l'objet qui vient d'être mis en vente. S'il n'y est plus en entier, l'annonce est
+     * supprimée et la partie déjà retirée rendue : un objet n'est jamais à la fois en vente et dans l'inventaire.
+     */
+    private boolean removeListedItem(Player seller, ItemStack toRemove, long auctionId) {
+        int wanted = toRemove.getAmount();
+        ItemStack template = toRemove.clone();
+        // removeItem modifie la quantité de l'objet passé : on compte sur la copie.
+        int missing = seller.getInventory().removeItem(toRemove).values().stream().mapToInt(ItemStack::getAmount).sum();
+        if (missing <= 0) {
+            return true;
+        }
+        if (auctionDAO.removeAuction(auctionId)) {
+            int removed = wanted - missing;
+            if (removed > 0) {
+                template.setAmount(removed);
+                giveOrDrop(seller, template);
+            }
+            plugin.getLogger().warning("Listing " + auctionId + " by " + seller.getName() + " cancelled: the item was no longer fully in the inventory.");
+        } else {
+            plugin.getLogger().severe("Critical error: listing " + auctionId + " by " + seller.getName()
+                + " could not be removed although the item was no longer fully in the inventory. Manual check needed.");
+        }
+        return false;
+    }
+
+    /**
+     * Dernier recours quand un objet ne peut pas être rangé dans les invendus (erreur base) : il est donné au
+     * propriétaire s'il est en ligne, sinon écrit dans la console (Base64) pour être restauré à la main.
+     */
+    private void rescueItem(UUID ownerUuid, ItemStack item, long auctionId) {
+        Player owner = Bukkit.getPlayer(ownerUuid);
+        if (owner != null && owner.isOnline()) {
+            giveOrDrop(owner, item.clone());
+            plugin.getLogger().warning("Item of auction " + auctionId + " could not be stored in expired items; given directly to " + owner.getName() + ".");
+        } else {
+            plugin.getLogger().severe("Critical error: item of auction " + auctionId + " could not be stored in expired items for owner " + ownerUuid
+                + ". Serialized item: " + SerializationUtil.serializeItemStack(item));
         }
     }
 }

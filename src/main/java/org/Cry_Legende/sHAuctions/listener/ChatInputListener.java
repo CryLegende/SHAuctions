@@ -11,6 +11,9 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
+
+import java.util.UUID;
 
 /**
  * Intercepte les messages de chat des joueurs en attente d'une saisie (enchère ou raison d'annulation).
@@ -81,6 +84,17 @@ public class ChatInputListener implements Listener {
                 }
             });
         }
+    }
+
+    /**
+     * Départ du joueur : ses saisies et sa proposition d'annonce en attente sont oubliées (sinon les cartes
+     * gardent une entrée par joueur jusqu'à sa prochaine saisie).
+     */
+    @EventHandler
+    public void onQuit(PlayerQuitEvent event) {
+        UUID uuid = event.getPlayer().getUniqueId();
+        chatInputManager.cancel(uuid);
+        chatInputManager.cancelAnnounce(uuid);
     }
 
     /**

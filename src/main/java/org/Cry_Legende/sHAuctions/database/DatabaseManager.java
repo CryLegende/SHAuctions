@@ -160,7 +160,9 @@ public class DatabaseManager {
 
     private void addColumnIfMissing(Connection conn, Statement stmt, String table, String column, String definition) throws SQLException {
         boolean exists = false;
-        try (java.sql.ResultSet rs = conn.createStatement().executeQuery("PRAGMA table_info(" + table + ");")) {
+        // Le Statement est fermé lui aussi (seul le ResultSet l'était)
+        try (Statement pragma = conn.createStatement();
+             java.sql.ResultSet rs = pragma.executeQuery("PRAGMA table_info(" + table + ");")) {
             while (rs.next()) {
                 if (column.equalsIgnoreCase(rs.getString("name"))) {
                     exists = true;

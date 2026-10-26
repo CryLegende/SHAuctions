@@ -1,7 +1,7 @@
 package org.Cry_Legende.sHAuctions.gui;
 
-import com.mojang.authlib.GameProfile;
-import com.mojang.authlib.properties.Property;
+import com.destroystokyo.paper.profile.PlayerProfile;
+import com.destroystokyo.paper.profile.ProfileProperty;
 import org.Cry_Legende.sHAuctions.SHAuctions;
 import org.Cry_Legende.sHAuctions.gui.types.*;
 import org.Cry_Legende.sHAuctions.model.GuiItemDefinition;
@@ -14,7 +14,6 @@ import org.bukkit.event.inventory.ClickType;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.SkullMeta;
 
-import java.lang.reflect.Field;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -125,14 +124,14 @@ public class GUIManager {
         }
         SkullMeta skullMeta = (SkullMeta) head.getItemMeta();
         if (skullMeta == null) return head;
-        GameProfile profile = new GameProfile(UUID.randomUUID(), null);
-        profile.getProperties().put("textures", new Property("textures", base64Texture));
+        // API de profils de Paper : le champ « profile » de CraftMetaSkull n'est plus un GameProfile depuis 1.20.5,
+        // l'ancienne réflexion levait une IllegalArgumentException qui empêchait l'ouverture du menu.
         try {
-            Field profileField = skullMeta.getClass().getDeclaredField("profile");
-            profileField.setAccessible(true);
-            profileField.set(skullMeta, profile);
-        } catch (NoSuchFieldException | IllegalAccessException e) {
-            plugin.getLogger().log(Level.WARNING, "Could not set player head texture via reflection", e);
+            PlayerProfile profile = Bukkit.createProfile(UUID.randomUUID(), null);
+            profile.setProperty(new ProfileProperty("textures", base64Texture));
+            skullMeta.setPlayerProfile(profile);
+        } catch (RuntimeException e) {
+            plugin.getLogger().log(Level.WARNING, "Could not set player head texture", e);
         }
         head.setItemMeta(skullMeta);
         return head;
