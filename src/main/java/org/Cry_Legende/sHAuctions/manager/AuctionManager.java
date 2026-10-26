@@ -32,8 +32,10 @@ import org.bukkit.inventory.meta.ItemMeta;
 
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 public class AuctionManager {
@@ -50,6 +52,8 @@ public class AuctionManager {
     // Verrou dédié aux enchères pour sérialiser withdraw/refund/update et éviter les races
     // lorsque plusieurs joueurs enchérissent quasi simultanément.
     private final Object bidLock = new Object();
+    // Annonces expirées illisibles déjà signalées : un seul avertissement par annonce, pas un toutes les 5 minutes
+    private final Set<Long> unreadableWarned = new HashSet<>();
 
     public AuctionManager(SHAuctions plugin) {
         this.plugin = plugin;
@@ -451,6 +455,10 @@ public class AuctionManager {
     }
 
     public boolean purchaseAuction(Player buyer, long auctionId) {
+        if (!buyer.hasPermission("shauctions.buy")) {
+            messageManager.sendMessage(buyer, "no_permission");
+            return false;
+        }
         AuctionItem auctionItem = auctionDAO.getAuctionById(auctionId);
         // Une enchère ne s'achète pas au prix de départ (l'offre en séquestre ne serait jamais rendue).
         if (auctionItem == null || auctionItem.isBid()) {
@@ -557,7 +565,8 @@ public class AuctionManager {
             return false;
         }
         boolean canCancel = false;
-        if (auctionItem.getSellerUuid().equals(canceller.getUniqueId()) && configManager.getBoolean("misc.allow_self_cancel", true)) {
+        if (auctionItem.getSellerUuid().equals(canceller.getUniqueId()) && canceller.hasPermission("shauctions.cancel.self")
+            && configManager.getBoolean("misc.allow_self_cancel", true)) {
             canCancel = true;
         } else if (isAdminCancel && canceller.hasPermission("shauctions.cancel.others") && configManager.getBoolean("misc.allow_admin_cancel", true)) {
             canCancel = true;
@@ -651,7 +660,9 @@ public class AuctionManager {
         for (AuctionItem auctionItem : expiredAuctionsFromDB) {
             ItemStack itemStack = auctionItem.getItemStack();
             if (itemStack == null) {
-                plugin.getLogger().warning("Could not deserialize item for expired auction ID: " + auctionItem.getId() + ". Skipping.");
+                if (unreadableWarned.add(auctionItem.getId())) {
+                    plugin.getLogger().warning("Could not deserialize item for expired auction ID: " + auctionItem.getId() + ". Skipping (left in database).");
+                }
                 // On pourrait envisager de supprimer l'enchère corrompue ici pour éviter des boucles
                 // auctionDAO.removeAuction(auctionItem.getId());
                 continue;

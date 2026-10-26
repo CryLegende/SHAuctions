@@ -189,7 +189,8 @@ public class SQLiteAuctionDAO implements AuctionDAO {
     public List<AuctionItem> getAuctionsBySeller(UUID sellerUuid) {
         String sortOrderConfig = plugin.getConfigManager().getString("display_options.own_sales_sort_order", "DESC").toUpperCase();
         String orderByClause = "ORDER BY list_timestamp " + ("ASC".equals(sortOrderConfig) ? "ASC" : "DESC");
-        String sql = "SELECT " + COLUMNS + " FROM auctions WHERE seller_uuid = ? AND type = 'SALE' AND expire_timestamp > ? " + orderByClause;
+        // Ventes directes ET enchères du joueur (« Vos objets en vente / aux enchères »)
+        String sql = "SELECT " + COLUMNS + " FROM auctions WHERE seller_uuid = ? AND expire_timestamp > ? " + orderByClause;
         List<AuctionItem> auctions = new ArrayList<>();
         long currentTime = System.currentTimeMillis() / 1000L;
         Connection conn = null;

@@ -141,7 +141,10 @@ public class SQLiteExpiredItemDAO implements ExpiredItemDAO {
         if (removeOnlyClaimed) {
             sqlBuilder.append("claimed = 1");
         } else {
-            sqlBuilder.append("(claimed = 1 OR (expiration_timestamp < ?))");
+            // Seuls les invendus ordinaires sont purgés : un objet d'enchère gagnée (déjà payé, présent dans sold_items)
+            // ou retiré par le staff (cancel_reason) n'est jamais détruit tant qu'il n'est pas réclamé
+            sqlBuilder.append("(claimed = 1 OR (expiration_timestamp < ? AND cancel_reason IS NULL AND NOT EXISTS ("
+                + "SELECT 1 FROM sold_items s WHERE s.original_auction_id = expired_items.original_auction_id)))");
             if (olderThanTimestamp <= 0 && !removeOnlyClaimed) {
                 plugin.getLogger().warning("clearExpiredItems called with removeOnlyClaimed=false and olderThanTimestamp<=0. This might be unintended. Check cleanup logic.");
             }
