@@ -23,7 +23,9 @@ import java.util.Map;
 /**
  * Onglet « Recherches » ({@code menus/wanted_requests.yml}) : ce que les joueurs cherchent.
  * Clic gauche sur une recherche = contacter son auteur ; clic droit = supprimer la sienne (ou n'importe laquelle
- * pour le staff). Les cases vides sont remplies avec {@code options.filler_material}.
+ * pour le staff). Vue « Vos recherches » ({@code menus/own_wanted_requests.yml}) : seulement celles du joueur,
+ * un clic = annuler. Les cases vides sont remplies avec {@code options.filler_material} ; l'item « aucune
+ * recherche » (slot -1) se place en {@code options.empty_slot}.
  */
 public class WantedMenu extends AbstractMenu {
 
@@ -31,12 +33,14 @@ public class WantedMenu extends AbstractMenu {
     private static final int WRAP = 32;
 
     private final WantedManager wanted;
+    private final boolean ownOnly;
     private List<WantedRequest> all = new ArrayList<>();
     private List<WantedRequest> page = new ArrayList<>();
 
-    public WantedMenu(SHAuctions plugin, GUIManager guiManager, Player viewer) {
-        super(plugin, guiManager, "wanted_requests", viewer);
+    public WantedMenu(SHAuctions plugin, GUIManager guiManager, Player viewer, boolean ownOnly) {
+        super(plugin, guiManager, ownOnly ? "own_wanted_requests" : "wanted_requests", viewer);
         this.wanted = plugin.getWantedManager();
+        this.ownOnly = ownOnly;
     }
 
     @Override
@@ -46,7 +50,7 @@ public class WantedMenu extends AbstractMenu {
             currentPage = 1;
             return;
         }
-        all = wanted.listActive();
+        all = ownOnly ? wanted.listActive(viewer.getUniqueId()) : wanted.listActive();
         List<Integer> slots = menuDefinition.getAuctionItemSlots();
         int perPage = slots == null || slots.isEmpty() ? 1 : slots.size();
         setTotalPages((int) Math.ceil((double) all.size() / perPage));
@@ -71,7 +75,8 @@ public class WantedMenu extends AbstractMenu {
             }
             if (all.isEmpty() && menuDefinition.getItems().containsKey(-1)) {
                 GuiItemDefinition empty = menuDefinition.getItem(-1);
-                inventory.setItem(slots.get(Math.min(slots.size() - 1, slots.size() / 2)), ItemUtil.createItemStack(empty.getMaterial(),
+                int emptySlot = parseSlot(menuDefinition.getOption("empty_slot", ""), slots.get(Math.min(slots.size() - 1, slots.size() / 2)));
+                inventory.setItem(emptySlot, ItemUtil.createItemStack(empty.getMaterial(),
                     PlaceholderUtil.applyPlaceholders(empty.getDisplayName(), getGlobalPlaceholders()),
                     PlaceholderUtil.applyPlaceholdersInList(empty.getLore(), getGlobalPlaceholders())));
             }
@@ -86,7 +91,8 @@ public class WantedMenu extends AbstractMenu {
         ph.put("{Created}", TimeUtil.formatDate(request.createdAt()));
         ph.put("{ExpiresIn}", TimeUtil.formatDuration(Math.max(0, request.expiresAt() - System.currentTimeMillis() / 1000L)));
         ph.put("{Id}", String.valueOf(request.id()));
-        String actionKey = request.isOwnedBy(viewer.getUniqueId()) ? "recherche_lore_action_vous"
+        String actionKey = ownOnly ? "recherche_lore_action_annuler"
+            : request.isOwnedBy(viewer.getUniqueId()) ? "recherche_lore_action_vous"
             : wanted.isStaff(viewer) ? "recherche_lore_action_staff" : "recherche_lore_action";
         ph.put("{Action}", plugin.getMessageManager().getMessage(actionKey, false));
 
@@ -104,6 +110,15 @@ public class WantedMenu extends AbstractMenu {
             }
         }
         return ItemUtil.createItemStack(format.getMaterial(), 1, PlaceholderUtil.applyPlaceholders(format.getDisplayName(), ph), lore);
+    }
+
+    private int parseSlot(String raw, int def) {
+        try {
+            int slot = Integer.parseInt(raw.trim());
+            return slot >= 0 && slot < inventory.getSize() ? slot : def;
+        } catch (NumberFormatException e) {
+            return def;
+        }
     }
 
     private static List<String> wrap(String text) {
@@ -161,7 +176,7 @@ public class WantedMenu extends AbstractMenu {
             refresh();
             return;
         }
-        if (clickType.isRightClick()) {
+        if (ownOnly || clickType.isRightClick()) {
             if (wanted.delete(viewer, request)) {
                 refresh();
             }

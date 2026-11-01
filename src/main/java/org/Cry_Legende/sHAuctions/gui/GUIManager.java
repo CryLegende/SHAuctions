@@ -76,7 +76,14 @@ public class GUIManager {
     }
 
     public void openWantedMenu(Player player, int page) {
-        org.Cry_Legende.sHAuctions.gui.types.WantedMenu menu = new org.Cry_Legende.sHAuctions.gui.types.WantedMenu(plugin, this, player);
+        org.Cry_Legende.sHAuctions.gui.types.WantedMenu menu = new org.Cry_Legende.sHAuctions.gui.types.WantedMenu(plugin, this, player, false);
+        menu.setCurrentPage(page);
+        menu.open();
+    }
+
+    /** Vue « Vos recherches » : les recherches en cours du joueur, un clic pour annuler. */
+    public void openOwnWantedMenu(Player player, int page) {
+        org.Cry_Legende.sHAuctions.gui.types.WantedMenu menu = new org.Cry_Legende.sHAuctions.gui.types.WantedMenu(plugin, this, player, true);
         menu.setCurrentPage(page);
         menu.open();
     }
@@ -105,6 +112,9 @@ public class GUIManager {
                 break;
             case "wanted_requests":
                 openWantedMenu(player, defaultPage);
+                break;
+            case "own_wanted_requests":
+                openOwnWantedMenu(player, defaultPage);
                 break;
             default:
                 player.sendMessage(plugin.getMessageManager().translateColors("&cLe menu '" + menuName + "' n'est pas géré par ouverture directe."));

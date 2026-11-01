@@ -226,3 +226,4 @@ recherche_contact_survol: '&7Envoyer un mail à &e%auteur%&7, même s''il est ho
 recherche_lore_action: '&7&o(( &f&oClic gauche &7&opour contacter l''auteur &7&o))'
 recherche_lore_action_vous: '&7&o(( &c&oClic droit &7&opour supprimer votre recherche &7&o))'
 recherche_lore_action_staff: '&7&o(( &f&oClic gauche &7&o: contacter, &c&oclic droit &7&o: supprimer &7&o))'
+recherche_lore_action_annuler: '&7&o(( &c&oCliquez &7&opour annuler cette recherche &7&o))'

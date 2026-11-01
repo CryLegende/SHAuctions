@@ -66,8 +66,27 @@ items:
   '9': { material: GRAY_STAINED_GLASS_PANE, name: " ", action: { type: FILLER } }
   '17': { material: GRAY_STAINED_GLASS_PANE, name: " ", action: { type: FILLER } }
   '47': { material: GRAY_STAINED_GLASS_PANE, name: " ", action: { type: FILLER } }
-  # Bouton « Recherches »
   '51':
+    material: GRAY_STAINED_GLASS_PANE
+    name: " "
+    action:
+      type: FILLER
+  # Bouton « Vos recherches » : vos demandes en cours, un clic pour annuler
+  '36':
+    material: NAME_TAG
+    name: "&6&lVos recherches"
+    lore:
+      - "&7"
+      - "&8&l« &fVos demandes en cours dans les"
+      - "&eRecherches&f. Cliquez sur l'une d'elles"
+      - "&fpour l'annuler. &8&l»"
+      - ""
+      - "&8• &fOu : &6/hdv recherche mes"
+    action:
+      type: OPEN_MENU
+      value: "own_wanted_requests"
+  # Bouton « Recherches »
+  '44':
     material: WRITABLE_BOOK
     name: "&e&lRecherches"
     lore:

@@ -86,3 +86,5 @@ options:
   open_sound: "BLOCK_CHEST_OPEN"
   # Vitre posée dans les cases vides (hors cases des recherches)
   filler_material: GRAY_STAINED_GLASS_PANE
+  # Case de l'item « aucune recherche »
+  empty_slot: 22

@@ -87,6 +87,10 @@ public final class WantedManager {
         return store.listActive(now());
     }
 
+    public List<WantedRequest> listActive(UUID owner) {
+        return store.listActiveByOwner(owner, now());
+    }
+
     public WantedRequest get(long id) {
         return store.get(id);
     }

@@ -101,6 +101,24 @@ public final class WantedStore {
         return out;
     }
 
+    /** Recherches encore valides d'un joueur, la plus récente d'abord. */
+    public List<WantedRequest> listActiveByOwner(UUID owner, long now) {
+        List<WantedRequest> out = new ArrayList<>();
+        try (PreparedStatement ps = db.getConnection().prepareStatement(
+            "SELECT * FROM wanted_requests WHERE owner_uuid = ? AND expires_at > ? ORDER BY created_at DESC, id DESC")) {
+            ps.setString(1, owner.toString());
+            ps.setLong(2, now);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    out.add(read(rs));
+                }
+            }
+        } catch (SQLException e) {
+            plugin.getLogger().log(Level.SEVERE, "Impossible de lire les recherches du joueur", e);
+        }
+        return out;
+    }
+
     public int countActive(UUID owner, long now) {
         try (PreparedStatement ps = db.getConnection().prepareStatement(
             "SELECT COUNT(*) FROM wanted_requests WHERE owner_uuid = ? AND expires_at > ?")) {

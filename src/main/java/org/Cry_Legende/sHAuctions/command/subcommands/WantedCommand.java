@@ -8,7 +8,8 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * {@code /hdv recherche} : ouvre l'onglet des recherches ; {@code /hdv recherche nouvelle} : dialogue de publication ;
+ * {@code /hdv recherche} : ouvre l'onglet des recherches ; {@code /hdv recherche mes} : vos recherches en cours ;
+ * {@code /hdv recherche nouvelle} : dialogue de publication ;
  * {@code /hdv recherche <texte>} : publie directement (clients sans dialogue).
  */
 public class WantedCommand implements SubCommand {
@@ -36,7 +37,7 @@ public class WantedCommand implements SubCommand {
 
     @Override
     public String getUsage() {
-        return "[nouvelle|<texte>]";
+        return "[mes|nouvelle|<texte>]";
     }
 
     @Override
@@ -54,6 +55,8 @@ public class WantedCommand implements SubCommand {
         Player player = (Player) sender;
         if (args.length == 0) {
             plugin.getGuiManager().openWantedMenu(player, 1);
+        } else if (args.length == 1 && args[0].equalsIgnoreCase("mes")) {
+            plugin.getGuiManager().openOwnWantedMenu(player, 1);
         } else if (args.length == 1 && args[0].equalsIgnoreCase("nouvelle")) {
             plugin.getWantedManager().openCreateDialog(player);
         } else if (plugin.getWantedManager().create(player, String.join(" ", args))) {
@@ -63,6 +66,9 @@ public class WantedCommand implements SubCommand {
 
     @Override
     public List<String> onTabComplete(CommandSender sender, String[] args) {
-        return args.length == 1 && "nouvelle".startsWith(args[0].toLowerCase()) ? List.of("nouvelle") : Collections.emptyList();
+        if (args.length != 1) {
+            return Collections.emptyList();
+        }
+        return List.of("mes", "nouvelle").stream().filter(s -> s.startsWith(args[0].toLowerCase())).toList();
     }
 }
