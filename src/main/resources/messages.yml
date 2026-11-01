@@ -161,6 +161,16 @@ dialog_auction_changed: '&7&l« &e&lSH &8&l» &7Cette annonce a &echangé &7depu
 # Textes des dialogues (sans préfixe). Codes & et &#RRGGBB acceptés.
 # Variables : %item_name% %seller% %min_bid% %current_bid% %highest_bidder% %time_left% (et %max% pour la raison).
 dialogues:
+  # Publication d'une recherche (onglet Recherches de l'HDV). %max% = longueur maximale.
+  recherche:
+    titre: '&8&lNouvelle recherche'
+    corps:
+      - '&7Écrivez ce que vous cherchez, avec la quantité'
+      - '&7et votre prix si vous voulez (%max% caractères max).'
+      - '&8Exemple : 10 stacks de sable, 500 SHC le stack'
+    champ: '&7Je cherche...'
+    valider: '&a&lPublier'
+    annuler: '&c&lAnnuler'
   enchere:
     titre: '&#F9C572&lMiser sur cette enchère'
     corps:
@@ -193,3 +203,26 @@ titles:
   purchase_success_subtitle: '&7Vous avez acheté &a%item_name%' # Info importante en couleur de succès
   sell_success_title: '&aItem en Vente!'
   sell_success_subtitle: '&7Votre &a%item_name% &7est maintenant listé.' # Info importante en couleur de succès
+
+# --- Recherches (/hdv recherche) ---
+# %min% %max% longueurs, %secondes% délai restant, %duree% durée de vie, %auteur% %texte% dans le contact
+recherche_desactivee: '&7&l« &c&lSH &8&l» &7Les recherches sont &cdésactivées&7.'
+recherche_trop_courte: '&7&l« &c&lSH &8&l» &7Votre recherche est trop courte (&c%min% caractères &7minimum).'
+recherche_trop_longue: '&7&l« &c&lSH &8&l» &7Votre recherche est trop longue (&c%max% caractères &7maximum).'
+recherche_texte_invalide: '&7&l« &c&lSH &8&l» &7Votre recherche contient des caractères &cinterdits&7.'
+recherche_mot_interdit: '&7&l« &c&lSH &8&l» &7Votre recherche contient un mot &cinterdit&7.'
+recherche_limite_atteinte: '&7&l« &c&lSH &8&l» &7Vous avez déjà &c%max% recherche(s) &7en cours. Supprimez-en une (clic droit).'
+recherche_attendre: '&7&l« &c&lSH &8&l» &7Attendez encore &c%secondes% s &7avant de publier une recherche.'
+recherche_erreur: '&7&l« &c&lSH &8&l» &7Une erreur est survenue, votre recherche n''a pas été publiée.'
+recherche_publiee: '&7&l« &a&lSH &8&l» &7Votre recherche est &apubliée &7pour &a%duree%&7.'
+recherche_pas_la_votre: '&7&l« &c&lSH &8&l» &7Ce n''est pas votre recherche.'
+recherche_introuvable: '&7&l« &c&lSH &8&l» &7Cette recherche n''existe plus.'
+recherche_supprimee: '&7&l« &e&lSH &8&l» &7Recherche &esupprimée&7.'
+recherche_la_votre: '&7&l« &e&lSH &8&l» &7C''est votre recherche : &eclic droit &7pour la supprimer.'
+recherche_utiliser_commande: '&7&l« &e&lSH &8&l» &7Publiez votre recherche avec &e/hdv recherche <ce que vous cherchez>&7.'
+recherche_contact: '&7&l« &e&lSH &8&l» &e%auteur% &7recherche : &f%texte%'
+recherche_contact_bouton: '&8&l» &a&l[Lui écrire]'
+recherche_contact_survol: '&7Envoyer un mail à &e%auteur%&7, même s''il est hors ligne'
+recherche_lore_action: '&7&o(( &f&oClic gauche &7&opour contacter l''auteur &7&o))'
+recherche_lore_action_vous: '&7&o(( &c&oClic droit &7&opour supprimer votre recherche &7&o))'
+recherche_lore_action_staff: '&7&o(( &f&oClic gauche &7&o: contacter, &c&oclic droit &7&o: supprimer &7&o))'

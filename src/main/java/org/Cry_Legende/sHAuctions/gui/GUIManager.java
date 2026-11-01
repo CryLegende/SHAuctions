@@ -75,6 +75,12 @@ public class GUIManager {
         menu.open(); // Ouvre avec son par défaut
     }
 
+    public void openWantedMenu(Player player, int page) {
+        org.Cry_Legende.sHAuctions.gui.types.WantedMenu menu = new org.Cry_Legende.sHAuctions.gui.types.WantedMenu(plugin, this, player);
+        menu.setCurrentPage(page);
+        menu.open();
+    }
+
     public void openMenuByName(Player player, String menuName) {
         plugin.getLogger().fine("Attempting to open menu by name: " + menuName + " for player " + player.getName());
         int defaultPage = 1;
@@ -96,6 +102,9 @@ public class GUIManager {
                 break;
             case "sales_history":
                 openSalesHistoryMenu(player, defaultPage, false, player.getUniqueId());
+                break;
+            case "wanted_requests":
+                openWantedMenu(player, defaultPage);
                 break;
             default:
                 player.sendMessage(plugin.getMessageManager().translateColors("&cLe menu '" + menuName + "' n'est pas géré par ouverture directe."));

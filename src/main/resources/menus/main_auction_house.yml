@@ -66,7 +66,19 @@ items:
   '9': { material: GRAY_STAINED_GLASS_PANE, name: " ", action: { type: FILLER } }
   '17': { material: GRAY_STAINED_GLASS_PANE, name: " ", action: { type: FILLER } }
   '47': { material: GRAY_STAINED_GLASS_PANE, name: " ", action: { type: FILLER } }
-  '51': { material: GRAY_STAINED_GLASS_PANE, name: " ", action: { type: FILLER } }
+  # Bouton « Recherches »
+  '51':
+    material: WRITABLE_BOOK
+    name: "&e&lRecherches"
+    lore:
+      - "&7"
+      - "&8&l« &fCe que les joueurs &echerchent&f."
+      - "&fContactez-les même s'ils sont hors ligne. &8&l»"
+      - ""
+      - "&8• &fPublier une recherche : &e/hdv recherche"
+    action:
+      type: OPEN_MENU
+      value: "wanted_requests"
 
 
   # Bouton Page Précédente

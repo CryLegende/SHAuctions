@@ -1,0 +1,88 @@
+# Onglet « Recherches » de l'HDV (/hdv recherche) : ce que les joueurs cherchent.
+# Règles (durée, nombre par joueur, longueur, mots interdits) : config.yml › recherches.
+# Clic gauche sur une recherche : contacter son auteur par mail. Clic droit : supprimer la vôtre (staff : toutes).
+# Placeholders du format : {Owner} {Text} (coupé sur plusieurs lignes) {Created} {ExpiresIn} {Id} {Action}.
+title: "&8&lHDV &8| Recherches ({currentPage}/{totalPages})"
+size: 54
+
+auction_item_slots:
+  - 10
+  - 11
+  - 12
+  - 13
+  - 14
+  - 15
+  - 16
+  - 19
+  - 20
+  - 21
+  - 22
+  - 23
+  - 24
+  - 25
+  - 28
+  - 29
+  - 30
+  - 31
+  - 32
+  - 33
+  - 34
+  - 37
+  - 38
+  - 39
+  - 40
+  - 41
+  - 42
+  - 43
+
+auction_item_format:
+  material: PAPER
+  name: "&eRecherche de &f{Owner}"
+  lore:
+    - "&f&m                                       &r"
+    - "&f{Text}"
+    - ""
+    - "&7Publiée le &f{Created}"
+    - "&7Expire dans &f{ExpiresIn}"
+    - "&f&m                                       &r"
+    - "{Action}"
+
+items:
+  '45':
+    material: PAPER
+    name: "&c⤾ Retour &7(clic)"
+    action:
+      type: OPEN_MENU
+      value: "main_auction_house"
+  '48':
+    material: ARROW
+    name: "&fPage Précédente"
+    action:
+      type: PREVIOUS_PAGE
+  '49':
+    material: WRITABLE_BOOK
+    name: "&a&lPublier une recherche"
+    lore:
+      - "&7"
+      - "&8&l« &fÉcrivez ce que vous cherchez : les"
+      - "&fautres joueurs pourront vous contacter. &8&l»"
+      - ""
+      - "&8• &fOu : &a/hdv recherche <ce que vous cherchez>"
+    action:
+      type: COMMAND
+      value: "player:hdv recherche nouvelle"
+  '50':
+    material: ARROW
+    name: "&fPage Suivante"
+    action:
+      type: NEXT_PAGE
+  '-1':
+    material: GLASS_BOTTLE
+    name: "&7Aucune recherche en cours"
+    lore:
+      - "&7Soyez le premier à publier ce que vous cherchez !"
+
+options:
+  open_sound: "BLOCK_CHEST_OPEN"
+  # Vitre posée dans les cases vides (hors cases des recherches)
+  filler_material: GRAY_STAINED_GLASS_PANE

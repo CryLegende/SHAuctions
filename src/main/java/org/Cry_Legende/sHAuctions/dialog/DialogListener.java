@@ -41,6 +41,13 @@ public final class DialogListener implements Listener {
             }
             Player player = game.getPlayer();
             DialogResponseView view = event.getDialogResponseView();
+            // Dialogue de publication d'une recherche (onglet Recherches)
+            if (id.value().startsWith(org.Cry_Legende.sHAuctions.wanted.WantedManager.DIALOG_PREFIX)) {
+                if (plugin.getWantedManager() != null) {
+                    plugin.getWantedManager().onDialogClick(player, id.value(), read(view, org.Cry_Legende.sHAuctions.wanted.WantedManager.INPUT_TEXT));
+                }
+                return;
+            }
             String amount = read(view, DialogManager.INPUT_AMOUNT);
             String reason = read(view, DialogManager.INPUT_REASON);
             manager.onClick(player, id.value(), amount, reason);
@@ -52,6 +59,9 @@ public final class DialogListener implements Listener {
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
         manager.forget(event.getPlayer().getUniqueId());
+        if (plugin.getWantedManager() != null) {
+            plugin.getWantedManager().forget(event.getPlayer().getUniqueId());
+        }
     }
 
     private static String read(DialogResponseView view, String key) {

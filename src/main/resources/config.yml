@@ -216,3 +216,23 @@ dialogues:
 
 # Préfixe du plugin dans les messages (laissé ici pour centralisation, mais sera géré par MessageManager)
 # plugin_prefix: "&8[&x&F&F&A&7&5&1SH&fAuctions&8] &r"
+
+# Onglet « Recherches » (/hdv recherche) : les joueurs publient ce qu'ils cherchent, les autres les contactent
+# par mail (même hors ligne). Aucun argent ni objet ne bouge. Publications et suppressions écrites dans la console.
+recherches:
+  actif: true
+  # Recherches en cours par joueur (permission shauctions.recherches.max.<n> pour plus, jusqu'à 20)
+  max-par-joueur: 3
+  # Durée de vie d'une recherche, en heures
+  duree-heures: 72
+  # Délai minimal entre deux publications, en secondes (le staff n'y est pas soumis)
+  delai-secondes: 30
+  longueur-min: 3
+  longueur-max: 80
+  # Commande suggérée par le bouton « Lui écrire » (%auteur% = auteur de la recherche)
+  commande-contact: '/mail %auteur% '
+  # Mots refusés (contenus dans le texte, sans tenir compte des majuscules)
+  mots-interdits:
+    - discord.gg
+    - http://
+    - https://

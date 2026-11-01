@@ -50,6 +50,9 @@ public class MenuConfigManager {
             }
         }
 
+        // Menus ajoutés après l'installation : créés s'ils manquent, même si le dossier existait déjà
+        saveDefaultMenuIfNotExists("wanted_requests.yml");
+
         File[] menuFiles = menusFolder.listFiles((dir, name) -> name.toLowerCase().endsWith(".yml"));
         if (menuFiles == null || menuFiles.length == 0) {
             plugin.getLogger().warning("No menu configuration files found in " + menusFolder.getPath() + ". Creating default examples if they don't exist.");

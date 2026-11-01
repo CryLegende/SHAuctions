@@ -45,6 +45,7 @@ public class SHAuctions extends JavaPlugin {
     private GUIManager guiManager;
     private PermissionManager permissionManager;
     private ChatInputManager chatInputManager;
+    private org.Cry_Legende.sHAuctions.wanted.WantedManager wantedManager;
     // null si l'API des dialogues est absente du serveur (saisie par chat uniquement)
     private DialogManager dialogManager;
     private ExpirationTask expirationTask;
@@ -96,6 +97,7 @@ public class SHAuctions extends JavaPlugin {
         guiManager = new GUIManager(this);
         chatInputManager = new ChatInputManager();
         auctionManager = new AuctionManager(this);
+        wantedManager = new org.Cry_Legende.sHAuctions.wanted.WantedManager(this);
         getLogger().info("Core managers initialized.");
 
         try {
@@ -254,6 +256,11 @@ public class SHAuctions extends JavaPlugin {
 
     public PermissionManager getPermissionManager() {
         return permissionManager;
+    }
+
+    /** Onglet « Recherches » de l'HDV. */
+    public org.Cry_Legende.sHAuctions.wanted.WantedManager getWantedManager() {
+        return wantedManager;
     }
 
     public ChatInputManager getChatInputManager() {

@@ -40,6 +40,7 @@ public class AuctionCommand implements CommandExecutor, TabCompleter {
         registerSubCommand(new ExpiredCommand(plugin));
         registerSubCommand(new OwnSalesCommand(plugin));
         registerSubCommand(new AnnounceCommand(plugin));
+        registerSubCommand(new org.Cry_Legende.sHAuctions.command.subcommands.WantedCommand(plugin));
         // Annulation staff via clic droit dans le GUI (aucun ID n'est exposé).
         // ... autres sous-commandes
     }

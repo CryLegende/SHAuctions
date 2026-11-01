@@ -55,3 +55,9 @@ permissions:
   shauctions.reload:
     description: Permet de recharger la configuration du plugin.
     default: op
+  shauctions.recherches.use:
+    description: Onglet Recherches de l'HDV (voir, publier, contacter, supprimer les siennes).
+    default: true
+  shauctions.recherches.admin:
+    description: Supprimer n'importe quelle recherche, sans délai entre deux publications.
+    default: op
