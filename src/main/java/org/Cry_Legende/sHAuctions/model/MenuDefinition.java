@@ -65,6 +65,15 @@ public class MenuDefinition {
         }
     }
 
+    /**
+     * Option lue comme texte, quel que soit le type YAML (un {@code empty_slot: 22} est un entier : le cast générique
+     * de {@link #getOption} ne lève son ClassCastException qu'au site d'appel, après coup).
+     */
+    public String getOptionString(String key, String defaultValue) {
+        Object raw = options == null ? null : options.get(key);
+        return raw == null ? defaultValue : String.valueOf(raw);
+    }
+
     public List<Integer> getAuctionItemSlots() {
         return auctionItemSlots;
     }

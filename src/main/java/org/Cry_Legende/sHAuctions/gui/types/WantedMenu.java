@@ -75,7 +75,7 @@ public class WantedMenu extends AbstractMenu {
             }
             if (all.isEmpty() && menuDefinition.getItems().containsKey(-1)) {
                 GuiItemDefinition empty = menuDefinition.getItem(-1);
-                int emptySlot = parseSlot(menuDefinition.getOption("empty_slot", ""), slots.get(Math.min(slots.size() - 1, slots.size() / 2)));
+                int emptySlot = parseSlot(menuDefinition.getOptionString("empty_slot", ""),slots.get(Math.min(slots.size() - 1, slots.size() / 2)));
                 inventory.setItem(emptySlot, ItemUtil.createItemStack(empty.getMaterial(),
                     PlaceholderUtil.applyPlaceholders(empty.getDisplayName(), getGlobalPlaceholders()),
                     PlaceholderUtil.applyPlaceholdersInList(empty.getLore(), getGlobalPlaceholders())));
@@ -141,7 +141,7 @@ public class WantedMenu extends AbstractMenu {
     }
 
     private void fillEmptySlots() {
-        Material filler = Material.matchMaterial(menuDefinition.getOption("filler_material", "GRAY_STAINED_GLASS_PANE"));
+        Material filler = Material.matchMaterial(menuDefinition.getOptionString("filler_material","GRAY_STAINED_GLASS_PANE"));
         if (filler == null || filler == Material.AIR) {
             return;
         }

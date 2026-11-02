@@ -92,7 +92,7 @@ public abstract class AbstractMenu implements InventoryHolder {
         guiManager.getOpenMenus().put(viewer.getUniqueId(), this);
 
         if (playOpenSound) {
-            String openSoundName = menuDefinition.getOption("open_sound", "");
+            String openSoundName = menuDefinition.getOptionString("open_sound", "");
             if (!openSoundName.isEmpty() && !openSoundName.equalsIgnoreCase("NONE")) {
                 Sound openSound = ConfigManager.sound(openSoundName);
                 if (openSound != null) {
