@@ -48,7 +48,7 @@ public class MenuRefreshListener implements Listener {
                 if (viewer.isOnline() && guiManager.getOpenMenu(viewer) == menuToRefresh) {
                     plugin.getLogger().fine("Executing refresh for menu " + menuToRefresh.getMenuName() +
                         " for player " + viewer.getName());
-                    menuToRefresh.refresh(); // Utilise la nouvelle méthode refresh() qui ne joue pas de son
+                    menuToRefresh.refresh(); // refresh() ne joue pas de son
                 } else {
                     plugin.getLogger().fine("Refresh cancelled for " + viewer.getName() +
                         ": player no longer online or menu changed.");

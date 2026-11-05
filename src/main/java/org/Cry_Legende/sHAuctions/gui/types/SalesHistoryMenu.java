@@ -188,7 +188,7 @@ public class SalesHistoryMenu extends AbstractMenu {
             }
         }
         populateStaticItems();
-        updateSwitchButton(); // Appel à la nouvelle méthode
+        updateSwitchButton();
     }
 
     private void updateSwitchButton() {
