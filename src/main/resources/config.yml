@@ -12,6 +12,10 @@
 #   /hdv history                 Historique des ventes ET enchères remportées.
 #   /hdv expired                 Vos invendus à récupérer (ventes et enchères).
 #   /hdv ownsales                Vos objets en vente / aux enchères en cours.
+#   /hdv announce [no]           Annonce à tout le serveur l'enchère qui vient d'être listée,
+#                                ou ignore la proposition.
+#   /hdv recherche [mes|nouvelle|<texte>]
+#                                Recherches des joueurs : voir, publier les siennes.
 #   /hdv reload                  Recharge config.yml, messages.yml et les menus.
 #   (Mise sur une enchère : clic gauche sur l'item dans la page Enchères, puis montant saisi dans
 #    un dialogue (clients 1.21.6+, voir « dialogues » plus bas) ou, pour les clients plus anciens, dans le chat.
@@ -34,6 +38,8 @@
 #   shauctions.cancel.self      Annuler ses propres ventes.             [true]
 #   shauctions.cancel.others    Annuler les ventes des autres (staff).  [op]
 #   shauctions.reload           Recharger la configuration.             [op]
+#   shauctions.recherches.use   Onglet Recherches de l'HDV.             [true]
+#   shauctions.recherches.admin Supprimer toute recherche, sans délai.  [op]
 #
 #   Limites NUMÉRIQUES (la valeur la plus élevée l'emporte ; sinon la valeur
 #   par défaut de config.yml est utilisée) :
@@ -44,6 +50,7 @@
 #                               avec shauctions.limit.3 (3 ventes) et aucune perm
 #                               bidlimit garde le défaut d'enchères ci-dessous (1).
 #   shauctions.bidlimit.unlimited  (ou shauctions.bidlimit.*)  Enchères illimitées.
+#   shauctions.recherches.max.<N>  Nb max de recherches en cours (N = 1..20).
 #
 #  PLACEHOLDERS
 #  ----------------------------------------------------------------------------
@@ -84,7 +91,7 @@ auction_limits:
   # Durée par défaut d'une enchère en secondes (ex: 86400 = 24 heures)
   default_duration_seconds: 86400
   # Durée minimale d'une enchère en secondes
-  min_duration_seconds: 60 # 1 heure
+  min_duration_seconds: 60 # 1 minute
   # Durée maximale d'une enchère en secondes
   max_duration_seconds: 259200 # 3 jours
   # Nombre maximum d'items qu'un joueur peut avoir en vente en même temps.
@@ -121,7 +128,7 @@ bids:
 
 # Items interdits (blacklist)
 # Les joueurs ne pourront pas vendre ces items. Utilisez les noms de matériaux Bukkit.
-# Exemple: ["BEDROCK", "COMMAND_BLOCK"]
+# Exemple : BEDROCK, COMMAND_BLOCK
 item_blacklist:
 - COMMAND_BLOCK
 - COMMAND_BLOCK_MINECART
@@ -133,12 +140,6 @@ item_blacklist:
 - BARRIER
 - LIGHT
 # - "SPAWNER" # Souvent blacklisté
-
-# Items avec enchantements interdits
-# Si un item a l'un de ces enchantements (même avec d'autres), il ne pourra pas être vendu.
-# Utilisez les clés d'enchantement Bukkit (ex: "minecraft:sharpness", "sharpness")
-# Pour l'instant, laissez vide si non utilisé, ou spécifiez des enchantements OP.
-# enchantment_blacklist: []
 
 # Options pour les items expirés
 expired_items:
@@ -153,7 +154,7 @@ expired_items:
 # Formatage de la date et de l'heure
 # Utilisez les motifs SimpleDateFormat (https://docs.oracle.com/javase/8/docs/api/java/text/SimpleDateFormat.html)
 date_format: dd/MM/yyyy HH:mm:ss # Pour l'expiration, l'historique etc.
-time_remaining_format: # Comment afficher le temps restant (non implémenté directement ici, sera utilisé dans le code)
+time_remaining_format: # Suffixes du temps restant
   days: j
   hours: h
   minutes: m
@@ -163,7 +164,7 @@ time_remaining_format: # Comment afficher le temps restant (non implémenté dir
 display_options:
   # Tri des items dans l'hôtel des ventes principal, historique, etc.
   # Valeurs possibles:
-  #   DESC (Descendant): Plus récent/cher en premier (comportement par défaut actuel pour les dates)
+  #   DESC (Descendant): Plus récent/cher en premier (par défaut pour les dates)
   #   ASC (Ascendant): Plus ancien/moins cher en premier
   auction_house_sort_order: DESC # Tri par list_timestamp
   sales_history_sort_order: DESC # Tri par sold_timestamp
@@ -202,7 +203,7 @@ misc:
   sound_on_expire_claim: ENTITY_ITEM_PICKUP
 
 # Saisie par dialogue natif (clients 1.21.6 et plus) : montant d'une mise et raison d'une annulation staff.
-# Les clients plus anciens (ou actif: false) gardent la saisie dans le chat, inchangée (« annuler » pour abandonner).
+# Les clients plus anciens (ou actif: false) gardent la saisie dans le chat (« annuler » pour abandonner).
 # Les textes des dialogues se règlent dans messages.yml, section « dialogues ».
 # Le montant saisi est revérifié par le serveur avec les mêmes règles qu'au chat (minimum, incrément, solde...).
 dialogues:
@@ -213,9 +214,6 @@ dialogues:
   min-protocol: 771
   # Durée de validité d'un dialogue ouvert, en secondes : passé ce délai, valider ne fait plus rien
   expiration-secondes: 300
-
-# Préfixe du plugin dans les messages (laissé ici pour centralisation, mais sera géré par MessageManager)
-# plugin_prefix: "&8[&x&F&F&A&7&5&1SH&fAuctions&8] &r"
 
 # Onglet « Recherches » (/hdv recherche) : les joueurs publient ce qu'ils cherchent, les autres les contactent
 # par mail (même hors ligne). Aucun argent ni objet ne bouge. Publications et suppressions écrites dans la console.
@@ -236,3 +234,43 @@ recherches:
     - discord.gg
     - http://
     - https://
+
+# Lignes écrites dans SHLogs (plugins/SHLogs/SHAuctions/).
+# file : nom du fichier de log. format : ligne écrite.
+# %price% suit formatting.price_format et formatting.abbreviate_large_prices.
+logs:
+  # Mise en vente directe.
+  # Variables : %player%, %amount%, %item%, %price%, %duration%.
+  mises-en-vente:
+    file: "mises-en-vente"
+    format: "%player% -> met en vente %amount% x %item% (%price% SHCoins, durée %duration%)"
+  # Mise aux enchères.
+  # Variables : %player%, %amount%, %item%, %price% (prix de départ), %duration%.
+  mises-aux-encheres:
+    file: "mises-en-vente"
+    format: "%player% -> met aux enchères %amount% x %item% (départ %price% SHCoins, durée %duration%)"
+  # Achat d'une vente directe.
+  # Variables : %buyer%, %seller%, %amount%, %item%, %price%.
+  achats:
+    file: "achats"
+    format: "%buyer% -> achète %amount% x %item% à %seller% (%price% SHCoins)"
+  # Enchère terminée avec un gagnant.
+  # Variables : %winner%, %seller%, %amount%, %item%, %price% (montant final).
+  encheres:
+    file: "encheres"
+    format: "%winner% -> remporte %amount% x %item% de %seller% (%price% SHCoins)"
+  # Annonce retirée par son vendeur.
+  # Variables : %player%, %amount%, %item%.
+  retraits:
+    file: "retraits"
+    format: "%player% -> retire son annonce (%amount% x %item%)"
+  # Objet récupéré dans le menu des invendus.
+  # Variables : %player%, %amount%, %item%.
+  retraits-invendus:
+    file: "retraits"
+    format: "%player% -> récupère ses invendus (%amount% x %item%)"
+  # Annonce annulée par le staff.
+  # Variables : %staff%, %seller%, %amount%, %item%, %reason%.
+  staff:
+    file: "staff"
+    format: "%staff% -> annule l'annonce de %seller% (%amount% x %item%, raison : %reason%)"

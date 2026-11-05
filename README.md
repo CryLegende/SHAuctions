@@ -22,11 +22,13 @@ Hôtel des ventes (/hdv) : ventes directes et enchères, invendus, historique et
 - **Repli sur le chat** : les clients plus anciens (ViaVersion donne leur version), `dialogues.actif: false` ou une API de dialogues absente gardent exactement la saisie par chat d'avant.
 - **Saisie au chat fiabilisée** : une mise refusée (trop basse, solde insuffisant, course perdue) ne ferme plus l'attente : le message d'erreur habituel s'affiche, puis le plugin redemande un montant (`bid_retry_prompt`), au lieu de laisser le montant retapé partir dans le chat public. L'attente ne se termine que sur une mise acceptée, `annuler`, l'expiration (60 s depuis la dernière tentative) ou une enchère devenue indisponible. `NaN`, `Infinity`, `0` et les négatifs sont refusés comme un montant invalide.
 
+Les mises en vente, achats, enchères remportées, retraits et annulations du staff sont écrits dans les fichiers `mises-en-vente`, `achats`, `encheres`, `retraits` et `staff` de SHLogs (`plugins/SHLogs/SHAuctions/`).
+
 Utilisé sur : **Opale**.
 
 ## Dépendances
 
-- Optionnelles : `Vault`, `ViaVersion` (version du client pour choisir dialogue ou chat ; sans lui tous les clients sont considérés compatibles)
+- Optionnelles : `Vault`, `ViaVersion` (version du client pour choisir dialogue ou chat ; sans lui tous les clients sont considérés compatibles), `SHLogs` (journal des actions, sinon écrit dans la console)
 
 ## Commandes
 
@@ -59,7 +61,7 @@ Fichiers par défaut repris du serveur (secrets remplacés par `CHANGE_ME`). Cli
 
 <pre>
 plugins/SHAuctions/
-├── <a href="src/main/resources/config.yml">config.yml</a>        dialogues.actif, dialogues.min-protocol (771 = 1.21.6), dialogues.expiration-secondes
+├── <a href="src/main/resources/config.yml">config.yml</a>        dialogues.actif, dialogues.min-protocol (771 = 1.21.6), dialogues.expiration-secondes, section logs (fichier et format de chaque ligne SHLogs)
 ├── <a href="src/main/resources/messages.yml">messages.yml</a>      section dialogues (titres, champs, boutons, erreurs), messages dialog_* et bid_retry_prompt ; les clés manquantes (dont generic_error_occurred) sont ajoutées au fichier du serveur au premier démarrage
 └── menus/
     ├── <a href="src/main/resources/menus/auction_bids.yml">auction_bids.yml</a>
@@ -67,7 +69,9 @@ plugins/SHAuctions/
     ├── <a href="src/main/resources/menus/expired_items.yml">expired_items.yml</a>
     ├── <a href="src/main/resources/menus/main_auction_house.yml">main_auction_house.yml</a>
     ├── <a href="src/main/resources/menus/own_sales.yml">own_sales.yml</a>
-    └── <a href="src/main/resources/menus/sales_history.yml">sales_history.yml</a>
+    ├── <a href="src/main/resources/menus/own_wanted_requests.yml">own_wanted_requests.yml</a>
+    ├── <a href="src/main/resources/menus/sales_history.yml">sales_history.yml</a>
+    └── <a href="src/main/resources/menus/wanted_requests.yml">wanted_requests.yml</a>
 </pre>
 
 ## Compilation

@@ -14,7 +14,10 @@ import org.Cry_Legende.sHAuctions.event.AuctionItemListedEvent;
 import org.Cry_Legende.sHAuctions.event.AuctionItemPurchasedEvent;
 import org.Cry_Legende.sHAuctions.model.AuctionItem;
 import org.Cry_Legende.sHAuctions.model.ExpiredItem;
+import org.Cry_Legende.sHAuctions.util.ActionLog;
 import org.Cry_Legende.sHAuctions.util.ItemUtil;
+import org.Cry_Legende.sHAuctions.util.PlaceholderUtil;
+import org.Cry_Legende.sHAuctions.util.PriceFormatterUtil;
 import org.Cry_Legende.sHAuctions.util.SerializationUtil;
 import org.Cry_Legende.sHAuctions.util.TimeUtil;
 
@@ -82,6 +85,14 @@ public class AuctionManager {
         }
         String name = ItemUtil.getItemName(item);
         return (name != null && !name.isEmpty()) ? name : ItemUtil.getMaterialNameFallback(item.getType());
+    }
+
+    /**
+     * Écrit une ligne dans SHLogs : fichier et format lus dans la section logs de config.yml.
+     */
+    private void writeLog(String key, String defaultFile, String defaultFormat, Map<String, String> variables) {
+        ActionLog.write(plugin, configManager.getString("logs." + key + ".file", defaultFile),
+            PlaceholderUtil.applyPlaceholders(configManager.getString("logs." + key + ".format", defaultFormat), variables));
     }
 
     /**
@@ -241,6 +252,13 @@ public class AuctionManager {
                 return false;
             }
             String itemNameForLogAndMsg = getItemNameForMessage(itemToSell);
+            writeLog("mises-en-vente", "mises-en-vente", "%player% -> met en vente %amount% x %item% (%price% SHCoins, durée %duration%)", Map.of(
+                "%player%", seller.getName(),
+                "%amount%", String.valueOf(itemToSell.getAmount()),
+                "%item%", itemNameForLogAndMsg,
+                "%price%", PriceFormatterUtil.formatPrice(price),
+                "%duration%", TimeUtil.formatDuration(durationInSeconds)
+            ));
             Map<String, String> placeholders = new HashMap<>();
             placeholders.put("item_name", itemNameForLogAndMsg);
             placeholders.put("amount", String.valueOf(itemToSell.getAmount()));
@@ -322,6 +340,13 @@ public class AuctionManager {
                 return false;
             }
             String itemNameForLogAndMsg = getItemNameForMessage(itemToSell);
+            writeLog("mises-aux-encheres", "mises-en-vente", "%player% -> met aux enchères %amount% x %item% (départ %price% SHCoins, durée %duration%)", Map.of(
+                "%player%", seller.getName(),
+                "%amount%", String.valueOf(itemToSell.getAmount()),
+                "%item%", itemNameForLogAndMsg,
+                "%price%", PriceFormatterUtil.formatPrice(startingPrice),
+                "%duration%", TimeUtil.formatDuration(durationInSeconds)
+            ));
             Map<String, String> placeholders = new HashMap<>();
             placeholders.put("item_name", itemNameForLogAndMsg);
             placeholders.put("amount", String.valueOf(itemToSell.getAmount()));
@@ -521,6 +546,13 @@ public class AuctionManager {
         invalidateDialogs(auctionId);
         giveOrDrop(buyer, purchasedItemStack.clone());
         String itemNameForMsgsAndLogs = getItemNameForMessage(purchasedItemStack);
+        writeLog("achats", "achats", "%buyer% -> achète %amount% x %item% à %seller% (%price% SHCoins)", Map.of(
+            "%buyer%", buyer.getName(),
+            "%seller%", auctionItem.getSellerName(),
+            "%amount%", String.valueOf(purchasedItemStack.getAmount()),
+            "%item%", itemNameForMsgsAndLogs,
+            "%price%", PriceFormatterUtil.formatPrice(auctionItem.getPrice())
+        ));
         soldItemDAO.addSoldItem(auctionId, auctionItem.getSellerUuid(), auctionItem.getSellerName(), buyer.getUniqueId(), buyer.getName(), itemNameForMsgsAndLogs, purchasedItemStack, auctionItem.getPrice(), "SALE");
 
         Map<String, String> buyerPlaceholders = new HashMap<>();
@@ -623,6 +655,22 @@ public class AuctionManager {
         if (!itemReturnedDirectly
             && !expiredItemDAO.addExpiredItem(auctionItem.getId(), auctionItem.getSellerUuid(), auctionItem.getSellerName(), itemToReturn, System.currentTimeMillis() / 1000L, storedReason)) {
             rescueItem(auctionItem.getSellerUuid(), itemToReturn, auctionId);
+        }
+
+        if (isStaffCancel) {
+            writeLog("staff", "staff", "%staff% -> annule l'annonce de %seller% (%amount% x %item%, raison : %reason%)", Map.of(
+                "%staff%", canceller.getName(),
+                "%seller%", auctionItem.getSellerName(),
+                "%amount%", String.valueOf(itemToReturn.getAmount()),
+                "%item%", itemNameForMsgsAndLogs,
+                "%reason%", (reason != null && !reason.isEmpty()) ? reason : "N/A"
+            ));
+        } else {
+            writeLog("retraits", "retraits", "%player% -> retire son annonce (%amount% x %item%)", Map.of(
+                "%player%", canceller.getName(),
+                "%amount%", String.valueOf(itemToReturn.getAmount()),
+                "%item%", itemNameForMsgsAndLogs
+            ));
         }
 
         if (isStaffCancel) {
@@ -791,6 +839,13 @@ public class AuctionManager {
                 messageManager.sendMessage(winner.getPlayer(), "bid_won_sent_to_expired", Collections.singletonMap("item_name", itemName));
             }
         }
+        writeLog("encheres", "encheres", "%winner% -> remporte %amount% x %item% de %seller% (%price% SHCoins)", Map.of(
+            "%winner%", winnerName != null ? winnerName : "?",
+            "%seller%", auction.getSellerName(),
+            "%amount%", String.valueOf(itemStack.getAmount()),
+            "%item%", itemName,
+            "%price%", PriceFormatterUtil.formatPrice(winningBid)
+        ));
         // Notifier le vendeur.
         if (seller.isOnline() && seller.getPlayer() != null) {
             Map<String, String> ph = new HashMap<>();
@@ -833,6 +888,11 @@ public class AuctionManager {
         if (expiredItemDAO.markAsClaimed(expiredItemId)) {
             giveOrDrop(player, itemStack.clone());
             String itemNameForMsgsAndLogs = getItemNameForMessage(itemStack);
+            writeLog("retraits-invendus", "retraits", "%player% -> récupère ses invendus (%amount% x %item%)", Map.of(
+                "%player%", player.getName(),
+                "%amount%", String.valueOf(itemStack.getAmount()),
+                "%item%", itemNameForMsgsAndLogs
+            ));
             messageManager.sendMessage(player, "expired_item_claimed", Collections.singletonMap("item_name", itemNameForMsgsAndLogs));
             playSound(player, configManager.getString("misc.sound_on_expire_claim"));
 
