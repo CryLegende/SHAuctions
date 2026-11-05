@@ -237,7 +237,7 @@ recherches:
 
 # Lignes écrites dans SHLogs (plugins/SHLogs/SHAuctions/).
 # file : nom du fichier de log. format : ligne écrite.
-# %price% suit formatting.price_format et formatting.abbreviate_large_prices.
+# %price% est le montant exact, sans arrondi à l'entier ni abréviation.
 logs:
   # Mise en vente directe.
   # Variables : %player%, %amount%, %item%, %price%, %duration%.
