@@ -208,8 +208,8 @@ public final class DialogManager {
         DialogBase dialogBase = DialogBase.builder(render(messages.getRaw(base + "titre", ""), placeholders))
                 // Échap = bouton « Annuler » : le client lance son action, la saisie est annulée proprement.
                 .canCloseWithEscape(true)
-                // L'écran reste affiché tant que le serveur n'a pas répondu (fermeture ou nouvel écran) : pas de double clic.
-                .afterAction(DialogBase.DialogAfterAction.WAIT_FOR_RESPONSE)
+                // fermé au clic : le client ne retire pas son écran d'attente quand le serveur ferme le dialogue
+                .afterAction(DialogBase.DialogAfterAction.CLOSE)
                 .body(body)
                 .inputs(List.of(input))
                 .build();
