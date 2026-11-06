@@ -27,8 +27,8 @@ public class SQLiteSoldItemDAO implements SoldItemDAO {
     @Override
     public boolean addSoldItem(Long originalAuctionId, UUID sellerUuid, String sellerName,
                                UUID buyerUuid, String buyerName, String itemNameDisplay,
-                               ItemStack itemStack, double price, String type) {
-        String sql = "INSERT INTO sold_items(original_auction_id, seller_uuid, seller_name, buyer_uuid, buyer_name, item_name, item_serialized, price, sold_timestamp, type) VALUES(?,?,?,?,?,?,?,?,?,?)";
+                               ItemStack itemStack, double price, String type, boolean sellerNotified) {
+        String sql = "INSERT INTO sold_items(original_auction_id, seller_uuid, seller_name, buyer_uuid, buyer_name, item_name, item_serialized, price, sold_timestamp, type, seller_notified) VALUES(?,?,?,?,?,?,?,?,?,?,?)";
         String serializedItem = SerializationUtil.serializeItemStack(itemStack);
         if (serializedItem == null) {
             plugin.getLogger().severe("Failed to serialize item for sold_items: " + (itemNameDisplay != null ? itemNameDisplay : itemStack.getType()));
@@ -56,6 +56,7 @@ public class SQLiteSoldItemDAO implements SoldItemDAO {
             pstmt.setDouble(8, price);
             pstmt.setLong(9, soldTimestamp);
             pstmt.setString(10, (type != null) ? type : "SALE");
+            pstmt.setInt(11, sellerNotified ? 1 : 0);
 
             return pstmt.executeUpdate() > 0;
 
@@ -66,6 +67,52 @@ public class SQLiteSoldItemDAO implements SoldItemDAO {
             // Ne pas fermer conn
         }
         return false;
+    }
+
+    @Override
+    public OfflineSales getOfflineSales(UUID sellerUuid) {
+        String sql = "SELECT id, item_name, price FROM sold_items WHERE seller_uuid = ? AND seller_notified = 0 ORDER BY id";
+        PreparedStatement pstmt = null;
+        ResultSet rs = null;
+        try {
+            pstmt = dbManager.getConnection().prepareStatement(sql);
+            pstmt.setString(1, sellerUuid.toString());
+            rs = pstmt.executeQuery();
+            int count = 0;
+            double total = 0;
+            String lastItem = null;
+            long lastId = 0;
+            while (rs.next()) {
+                count++;
+                total += rs.getDouble("price");
+                lastItem = rs.getString("item_name");
+                lastId = rs.getLong("id");
+            }
+            return count == 0 ? null : new OfflineSales(count, total, lastItem, lastId);
+        } catch (SQLException e) {
+            plugin.getLogger().log(Level.SEVERE, "Could not read offline sales of " + sellerUuid, e);
+            return null;
+        } finally {
+            closeQuietly(rs);
+            closeQuietly(pstmt);
+        }
+    }
+
+    @Override
+    public boolean markOfflineSalesNotified(UUID sellerUuid, long lastId) {
+        String sql = "UPDATE sold_items SET seller_notified = 1 WHERE seller_uuid = ? AND seller_notified = 0 AND id <= ?";
+        PreparedStatement pstmt = null;
+        try {
+            pstmt = dbManager.getConnection().prepareStatement(sql);
+            pstmt.setString(1, sellerUuid.toString());
+            pstmt.setLong(2, lastId);
+            return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            plugin.getLogger().log(Level.SEVERE, "Could not mark offline sales of " + sellerUuid, e);
+            return false;
+        } finally {
+            closeQuietly(pstmt);
+        }
     }
 
     private List<SoldItem> getHistoryListWithManualClose(String baseSqlWithOrderBy, int page, int itemsPerPage, String... params) {

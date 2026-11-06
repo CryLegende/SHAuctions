@@ -26,6 +26,12 @@ public class PlayerJoinListener implements Listener {
     public void onPlayerJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
 
+        if (plugin.getConfigManager().getBoolean("offline_sales.notify_on_join", true)) {
+            long salesDelay = Math.max(0L, plugin.getConfigManager().getLong("offline_sales.notification_delay_ticks_on_join", 80L));
+            plugin.getServer().getScheduler().runTaskLaterAsynchronously(plugin,
+                () -> plugin.getAuctionManager().notifyOfflineSales(player), salesDelay);
+        }
+
         if (!plugin.getConfigManager().getBoolean("expired_items.notify_on_join", true)) {
             return;
         }

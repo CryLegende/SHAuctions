@@ -141,6 +141,8 @@ public class DatabaseManager {
         addColumnIfMissing(conn, stmt, "auctions", "highest_bidder_name", "TEXT");
         addColumnIfMissing(conn, stmt, "expired_items", "cancel_reason", "TEXT");
         addColumnIfMissing(conn, stmt, "sold_items", "type", "TEXT NOT NULL DEFAULT 'SALE'");
+        // 1 par défaut : les ventes déjà en base ne déclenchent aucun récapitulatif.
+        addColumnIfMissing(conn, stmt, "sold_items", "seller_notified", "INTEGER NOT NULL DEFAULT 1");
     }
 
     /**

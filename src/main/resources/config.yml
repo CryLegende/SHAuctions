@@ -151,6 +151,12 @@ expired_items:
   # Notifier le joueur à la connexion s'il a des items expirés à récupérer.
   notify_on_join: true
 
+offline_sales:
+  # Récapitulatif à la connexion des ventes faites pendant l'absence du vendeur.
+  notify_on_join: true
+  # Délai après la connexion, en ticks.
+  notification_delay_ticks_on_join: 80
+
 # Formatage de la date et de l'heure
 # Utilisez les motifs SimpleDateFormat (https://docs.oracle.com/javase/8/docs/api/java/text/SimpleDateFormat.html)
 date_format: dd/MM/yyyy HH:mm:ss # Pour l'expiration, l'historique etc.

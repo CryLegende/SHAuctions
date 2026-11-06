@@ -82,6 +82,8 @@ gui_title_sales_history: '&1&lHistorique des Ventes'
 # Messages pour les items expirés
 expired_notification_on_join: '&7&l« &e&lSH &8&l» &7Vous avez &e%count% &7item(s)
   expiré(s) à récupérer. Utilisez &b/hdv expired&7.'
+offline_sale_single: '&7&l« &a&lSH &8&l» &7Pendant votre absence, votre item &a%item_name% &7a été vendu pour &a%price% SHC&7.'
+offline_sales_recap: '&7&l« &a&lSH &8&l» &7Pendant votre absence, &a%count% &7de vos items ont été vendus pour &a%price% SHC&7.'
 no_expired_items: '&7&l« &e&lSH &8&l» &7Vous n''avez aucun item expiré à récupérer.'
 expired_item_claimed: '&7&l« &a&lSH &8&l» &7Vous avez récupéré &a%item_name%&7.'
 expired_items_cleaned_up: '&7&l« &e&lSH &8&l» &e%count% &7items expirés anciens ont

@@ -20,10 +20,37 @@ public interface SoldItemDAO {
      * @param itemStack         L'ItemStack vendu (pour la sérialisation).
      * @param price             Le prix de vente.
      * @param type              "SALE" (vente directe) ou "BID" (enchère remportée).
+     * @param sellerNotified    false si le vendeur était absent : la vente ira dans son récapitulatif de connexion.
      * @return true si l'ajout a réussi, false sinon.
      */
     boolean addSoldItem(Long originalAuctionId, UUID sellerUuid, String sellerName,
-                        UUID buyerUuid, String buyerName, String itemName, ItemStack itemStack, double price, String type);
+                        UUID buyerUuid, String buyerName, String itemName, ItemStack itemStack, double price, String type,
+                        boolean sellerNotified);
+
+    /**
+     * Ventes pas encore annoncées à ce vendeur.
+     *
+     * @return le récapitulatif, ou null s'il n'y en a aucune ou en cas d'erreur base.
+     */
+    OfflineSales getOfflineSales(UUID sellerUuid);
+
+    /**
+     * Marque comme annoncées les ventes de ce vendeur jusqu'à {@code lastId} inclus.
+     *
+     * @return true si l'écriture a réussi.
+     */
+    boolean markOfflineSalesNotified(UUID sellerUuid, long lastId);
+
+    /**
+     * Ventes faites pendant l'absence d'un vendeur.
+     *
+     * @param count    nombre de ventes.
+     * @param total    somme encaissée.
+     * @param lastItem nom du dernier item vendu.
+     * @param lastId   id de la dernière vente lue.
+     */
+    record OfflineSales(int count, double total, String lastItem, long lastId) {
+    }
 
     /**
      * Récupère l'historique des ventes d'un joueur (en tant que vendeur).

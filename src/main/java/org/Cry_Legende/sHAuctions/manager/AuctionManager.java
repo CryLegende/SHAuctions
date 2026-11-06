@@ -563,7 +563,8 @@ public class AuctionManager {
             "%item%", itemNameForMsgsAndLogs,
             "%price%", logPrice(auctionItem.getPrice())
         );
-        soldItemDAO.addSoldItem(auctionId, auctionItem.getSellerUuid(), auctionItem.getSellerName(), buyer.getUniqueId(), buyer.getName(), itemNameForMsgsAndLogs, purchasedItemStack, auctionItem.getPrice(), "SALE");
+        boolean sellerOnline = seller.isOnline() && seller.getPlayer() != null;
+        soldItemDAO.addSoldItem(auctionId, auctionItem.getSellerUuid(), auctionItem.getSellerName(), buyer.getUniqueId(), buyer.getName(), itemNameForMsgsAndLogs, purchasedItemStack, auctionItem.getPrice(), "SALE", sellerOnline);
 
         Map<String, String> buyerPlaceholders = new HashMap<>();
         buyerPlaceholders.put("item_name", itemNameForMsgsAndLogs);
@@ -571,7 +572,7 @@ public class AuctionManager {
         buyerPlaceholders.put("seller", auctionItem.getSellerName());
         messageManager.sendMessage(buyer, "item_purchased_successfully", buyerPlaceholders);
         playSound(buyer, configManager.getString("misc.sound_on_purchase"));
-        if (seller.isOnline() && seller.getPlayer() != null) {
+        if (sellerOnline) {
             Map<String, String> sellerPlaceholders = new HashMap<>();
             sellerPlaceholders.put("item_name", itemNameForMsgsAndLogs);
             sellerPlaceholders.put("price", economyProvider.formatCurrency(auctionItem.getPrice()));
@@ -822,7 +823,8 @@ public class AuctionManager {
         invalidateDialogs(auction.getId());
 
         // Enregistrer dans l'historique des ventes.
-        soldItemDAO.addSoldItem(auction.getId(), auction.getSellerUuid(), auction.getSellerName(), winnerUuid, winnerName, itemName, itemStack, winningBid, "BID");
+        boolean sellerOnline = seller.isOnline() && seller.getPlayer() != null;
+        soldItemDAO.addSoldItem(auction.getId(), auction.getSellerUuid(), auction.getSellerName(), winnerUuid, winnerName, itemName, itemStack, winningBid, "BID", sellerOnline);
 
         // Remettre l'item au gagnant ; sinon dans ses invendus.
         final ItemStack winnerItem = itemStack.clone();
@@ -857,7 +859,7 @@ public class AuctionManager {
             "%price%", logPrice(winningBid)
         );
         // Notifier le vendeur.
-        if (seller.isOnline() && seller.getPlayer() != null) {
+        if (sellerOnline) {
             Map<String, String> ph = new HashMap<>();
             ph.put("item_name", itemName);
             ph.put("price", economyProvider.formatCurrency(winningBid));
@@ -870,6 +872,27 @@ public class AuctionManager {
         plugin.getLogger().info(String.format("ENCHÈRE REMPORTÉE: %s remporte %d x %s pour %s (vendeur %s, ID %d).",
             winnerName, itemStack.getAmount(), itemName, economyProvider.formatCurrency(winningBid), auction.getSellerName(), auction.getId()));
         return true;
+    }
+
+    /**
+     * Récapitulatif des ventes faites pendant l'absence du vendeur. Accès base : à appeler hors du thread principal.
+     */
+    public void notifyOfflineSales(Player player) {
+        SoldItemDAO.OfflineSales sales = soldItemDAO.getOfflineSales(player.getUniqueId());
+        if (sales == null || !player.isOnline() || !soldItemDAO.markOfflineSalesNotified(player.getUniqueId(), sales.lastId())) {
+            return;
+        }
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            if (!player.isOnline()) {
+                return;
+            }
+            Map<String, String> ph = new HashMap<>();
+            ph.put("count", String.valueOf(sales.count()));
+            ph.put("item_name", sales.lastItem());
+            ph.put("price", economyProvider.formatCurrency(sales.total()));
+            messageManager.sendMessage(player, sales.count() == 1 ? "offline_sale_single" : "offline_sales_recap", ph);
+            playSound(player, configManager.getString("misc.sound_on_sell"));
+        });
     }
 
     public boolean claimExpiredItem(Player player, long expiredItemId) {
