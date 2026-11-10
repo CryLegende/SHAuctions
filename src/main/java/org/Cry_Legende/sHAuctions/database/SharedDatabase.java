@@ -186,6 +186,37 @@ public final class SharedDatabase {
         }
     }
 
+    /**
+     * Numérote les nouvelles annonces au-delà de toutes celles déjà connues. Les ventes et les invendus repris de
+     * l'ancienne base gardent l'identifiant de leur annonce, souvent plus grand que la dernière annonce encore en cours :
+     * sans cela, la vente ou le retour aux invendus d'une nouvelle annonce heurte la clé unique sur original_auction_id
+     * (vente payée mais jamais confirmée, enchère jamais réglée). Ne fait que monter le compteur, jamais le baisser.
+     */
+    public void raiseAuctionIdsAboveHistory() {
+        try (Connection c = getConnection(); Statement st = c.createStatement()) {
+            long highest;
+            try (ResultSet rs = st.executeQuery("SELECT GREATEST("
+                + "COALESCE((SELECT MAX(id) FROM " + AUCTIONS + "), 0), "
+                + "COALESCE((SELECT MAX(original_auction_id) FROM " + SOLD + "), 0), "
+                + "COALESCE((SELECT MAX(original_auction_id) FROM " + EXPIRED + "), 0))")) {
+                highest = rs.next() ? rs.getLong(1) : 0L;
+            }
+            long next = 0L;
+            try (ResultSet rs = st.executeQuery("SELECT AUTO_INCREMENT FROM information_schema.TABLES "
+                + "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '" + AUCTIONS + "'")) {
+                if (rs.next()) {
+                    next = rs.getLong(1);
+                }
+            }
+            if (next <= highest) {
+                st.executeUpdate("ALTER TABLE " + AUCTIONS + " AUTO_INCREMENT = " + (highest + 1));
+                logger.info("Numérotation des annonces reprise à " + (highest + 1) + " (au-delà des ventes et invendus déjà en base).");
+            }
+        } catch (SQLException e) {
+            logger.warning("Numérotation des annonces non vérifiée (droit ALTER manquant ?) : " + e.getMessage());
+        }
+    }
+
     private static boolean hasTable(Connection lite, String table) throws SQLException {
         try (PreparedStatement ps = lite.prepareStatement("SELECT name FROM sqlite_master WHERE type='table' AND name=?")) {
             ps.setString(1, table);

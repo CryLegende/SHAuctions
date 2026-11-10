@@ -76,6 +76,7 @@ public class DatabaseManager {
                 plugin.getLogger().info("Base SQLite " + sqlite.getName() + " reprise dans MariaDB : " + imported + " ligne(s).");
             }
             retireSqlite(sqlite);
+            opened.raiseAuctionIdsAboveHistory();
             this.shared = opened;
             java.util.function.BinaryOperator<String> option = (path, def) -> plugin.getConfigManager().getString(path, def);
             this.auctionDAO = new MariaAuctionDAO(opened, plugin.getLogger(), option);
