@@ -63,6 +63,24 @@ public class MenuRefreshListener implements Listener {
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onAuctionItemListed(AuctionItemListedEvent event) {
         plugin.getLogger().fine("AuctionItemListedEvent detected. Checking AuctionHouseMenu instances for refresh.");
+        refreshForNewListing();
+    }
+
+    /**
+     * Mode réseau : une annonce a changé sur un autre serveur ({@code listed}, {@code bid}, {@code removed}). Les menus
+     * ouverts ici se rafraîchissent comme pour un changement local.
+     */
+    public void refreshFromNetwork(String kind, long auctionId, UUID sellerUuid, UUID buyerUuid) {
+        if ("listed".equals(kind)) {
+            refreshForNewListing();
+        } else if ("bid".equals(kind)) {
+            guiManager.refreshOpenBidMenus();
+        } else {
+            handleItemRemovalOrUpdate(auctionId, sellerUuid, buyerUuid, buyerUuid != null);
+        }
+    }
+
+    private void refreshForNewListing() {
         for (AbstractMenu openMenu : new ArrayList<>(guiManager.getOpenMenus().values())) {
             if (openMenu instanceof AuctionHouseMenu) {
                 AuctionHouseMenu ahMenu = (AuctionHouseMenu) openMenu;
@@ -105,9 +123,14 @@ public class MenuRefreshListener implements Listener {
 
     private void handleItemRemovalOrUpdateEvent(AuctionItem affectedItem, Player buyerForPurchaseEvent) {
         if (affectedItem == null) return;
-        final long affectedItemId = affectedItem.getId();
-        final UUID sellerUuid = affectedItem.getSellerUuid();
-        final UUID buyerUuid = (buyerForPurchaseEvent != null) ? buyerForPurchaseEvent.getUniqueId() : null;
+        handleItemRemovalOrUpdate(affectedItem.getId(), affectedItem.getSellerUuid(),
+            buyerForPurchaseEvent != null ? buyerForPurchaseEvent.getUniqueId() : null, buyerForPurchaseEvent != null);
+    }
+
+    /**
+     * @param purchase vrai pour un achat ou une enchère remportée (les invendus du vendeur ne changent pas)
+     */
+    private void handleItemRemovalOrUpdate(long affectedItemId, UUID sellerUuid, UUID buyerUuid, boolean purchase) {
 
         for (AbstractMenu openMenu : new ArrayList<>(guiManager.getOpenMenus().values())) {
             // Cas 1: AuctionHouseMenu
@@ -155,7 +178,7 @@ public class MenuRefreshListener implements Listener {
                 scheduleMenuRefresh(openMenu);
             }
             // Cas 3: ExpiredItemsMenu du vendeur (pertinent pour Cancelled et Expired)
-            else if (openMenu instanceof ExpiredItemsMenu && openMenu.getViewer().getUniqueId().equals(sellerUuid) && buyerForPurchaseEvent == null) { // buyerForPurchaseEvent null indique Cancelled ou Expired
+            else if (openMenu instanceof ExpiredItemsMenu && openMenu.getViewer().getUniqueId().equals(sellerUuid) && !purchase) { // ni achat ni enchère remportée : annulation ou expiration
                 scheduleMenuRefresh(openMenu);
             }
             // Cas 4: SalesHistoryMenu

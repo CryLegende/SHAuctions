@@ -4,6 +4,9 @@ import org.Cry_Legende.sHAuctions.SHAuctions;
 import org.Cry_Legende.sHAuctions.database.dao.AuctionDAO;
 import org.Cry_Legende.sHAuctions.database.dao.ExpiredItemDAO;
 import org.Cry_Legende.sHAuctions.database.dao.SoldItemDAO;
+import org.Cry_Legende.sHAuctions.database.impl.MariaAuctionDAO;
+import org.Cry_Legende.sHAuctions.database.impl.MariaExpiredItemDAO;
+import org.Cry_Legende.sHAuctions.database.impl.MariaSoldItemDAO;
 import org.Cry_Legende.sHAuctions.database.impl.SQLiteAuctionDAO;
 import org.Cry_Legende.sHAuctions.database.impl.SQLiteExpiredItemDAO;
 import org.Cry_Legende.sHAuctions.database.impl.SQLiteSoldItemDAO;
@@ -18,6 +21,8 @@ public class DatabaseManager {
 
     private final SHAuctions plugin;
     private SQLiteConnector connector;
+    // Base MariaDB partagée (mode réseau) ; null avec la base SQLite habituelle
+    private SharedDatabase shared;
 
     private AuctionDAO auctionDAO;
     private SoldItemDAO soldItemDAO;
@@ -53,6 +58,91 @@ public class DatabaseManager {
         } catch (SQLException e) {
             plugin.getLogger().log(Level.SEVERE, "Could not initialize the database (tables or DAOs)!", e);
             return false;
+        }
+    }
+
+    /**
+     * Mode réseau : annonces, ventes, invendus et recherches dans MariaDB, communs à tous les serveurs. Le premier
+     * serveur qui démarre ainsi reprend une fois la base SQLite de son dossier.
+     */
+    public boolean initializeShared(String url, String user, String password, int timeoutMs, String serverName) {
+        SharedDatabase opened = null;
+        try {
+            opened = new SharedDatabase(plugin.getLogger(), url, user, password, timeoutMs);
+            opened.createTables();
+            File sqlite = new File(plugin.getDataFolder(), plugin.getConfigManager().getString("database.filename", "shauctions.db"));
+            int imported = opened.importSqliteOnce(sqlite, serverName);
+            if (imported >= 0) {
+                plugin.getLogger().info("Base SQLite " + sqlite.getName() + " reprise dans MariaDB : " + imported + " ligne(s).");
+            }
+            retireSqlite(sqlite);
+            this.shared = opened;
+            java.util.function.BinaryOperator<String> option = (path, def) -> plugin.getConfigManager().getString(path, def);
+            this.auctionDAO = new MariaAuctionDAO(opened, plugin.getLogger(), option);
+            this.soldItemDAO = new MariaSoldItemDAO(opened, plugin.getLogger(), option);
+            this.expiredItemDAO = new MariaExpiredItemDAO(opened, plugin.getLogger(), option);
+            return true;
+        } catch (SQLException | RuntimeException e) {
+            plugin.getLogger().log(Level.SEVERE, "Base MariaDB partagée indisponible (" + url + ")", e);
+            if (opened != null) {
+                opened.close();
+            }
+            return false;
+        }
+    }
+
+    /**
+     * Met de côté la base SQLite une fois le mode réseau en place ({@code shauctions.db.avant-reseau}) : si le plugin
+     * repassait un jour sur SQLite, il ne retrouverait pas des annonces déjà vendues ou retirées sur le réseau.
+     */
+    private void retireSqlite(File sqlite) {
+        if (!sqlite.isFile()) {
+            return;
+        }
+        String suffix = ".avant-reseau";
+        File target = new File(sqlite.getParentFile(), sqlite.getName() + suffix);
+        if (target.exists()) {
+            suffix = ".avant-reseau-" + System.currentTimeMillis();
+            target = new File(sqlite.getParentFile(), sqlite.getName() + suffix);
+        }
+        if (!sqlite.renameTo(target)) {
+            plugin.getLogger().warning("Base SQLite " + sqlite.getName() + " non renommée : à mettre de côté à la main avant tout retour sans SHNetwork.");
+            return;
+        }
+        for (String extra : new String[]{"-wal", "-shm"}) {
+            File side = new File(sqlite.getParentFile(), sqlite.getName() + extra);
+            if (side.isFile() && !side.renameTo(new File(sqlite.getParentFile(), sqlite.getName() + extra + suffix))) {
+                plugin.getLogger().warning("Fichier " + side.getName() + " non renommé.");
+            }
+        }
+        plugin.getLogger().info("Base SQLite mise de côté : " + target.getName());
+    }
+
+    /** Vrai en mode réseau (base MariaDB commune à tous les serveurs). */
+    public boolean isShared() {
+        return shared != null;
+    }
+
+    /** Annonces en MariaDB, avec les opérations atomiques du mode réseau. Null hors mode réseau. */
+    public MariaAuctionDAO getSharedAuctions() {
+        return shared != null ? (MariaAuctionDAO) auctionDAO : null;
+    }
+
+    /**
+     * Connexion pour une requête : la connexion SQLite unique (à ne pas fermer), ou une connexion du pool MariaDB.
+     * Toujours rendue par {@link #giveBack(Connection)}.
+     */
+    public Connection borrow() throws SQLException {
+        return shared != null ? shared.getConnection() : getConnection();
+    }
+
+    public void giveBack(Connection connection) {
+        if (shared != null && connection != null) {
+            try {
+                connection.close();
+            } catch (SQLException ignored) {
+                // connexion déjà rendue au pool
+            }
         }
     }
 
@@ -193,6 +283,9 @@ public class DatabaseManager {
     public void close() {
         if (connector != null) {
             connector.closeConnection();
+        }
+        if (shared != null) {
+            shared.close();
         }
     }
 

@@ -175,6 +175,13 @@ public final class WantedManager {
         }
         long cooldown = config().getLong("recherches.delai-secondes", 30);
         Long last = lastCreate.get(uuid);
+        if (plugin.getDatabaseManager().isShared() && !isStaff(player)) {
+            // Mode réseau : une publication faite sur un autre serveur compte aussi
+            long elsewhere = store.lastCreated(uuid);
+            if (elsewhere > 0 && (last == null || elsewhere > last)) {
+                last = elsewhere;
+            }
+        }
         if (last != null && now - last < cooldown && !isStaff(player)) {
             send(player, "recherche_attendre", Map.of("secondes", String.valueOf(cooldown - (now - last))));
             return false;

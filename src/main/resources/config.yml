@@ -69,6 +69,25 @@
 database:
   filename: shauctions.db
 
+# Mode réseau : avec SHNetwork, un seul hôtel des ventes pour tous les serveurs du réseau. Annonces, ventes,
+# invendus et recherches sont dans MariaDB ; un achat, une mise, une annulation ou une échéance n'est réglé que par
+# un seul serveur, et un joueur connecté sur un autre serveur reçoit quand même ses avis (surenchère, vente...).
+# Les échéances ne tournent que sur un serveur à la fois (le meneur).
+# Sans SHNetwork, cette section ne sert pas et la base SQLite ci-dessus reste utilisée.
+reseau:
+  actif: true
+  # Canal du bus SHNetwork : avis aux joueurs, annonces d'enchères, rafraîchissement des menus ouverts
+  canal: shauctions
+  # Base MariaDB commune (tables shauctions_*). Au premier démarrage en mode réseau, la base SQLite de ce serveur
+  # y est reprise une fois pour tout le réseau ; chaque serveur renomme ensuite la sienne en <fichier>.avant-reseau.
+  # Si cette base est injoignable, l'HDV se désactive sur ce serveur (jamais de retour à la base SQLite locale).
+  base-de-donnees:
+    url: "jdbc:mariadb://127.0.0.1:3306/bo_net"
+    utilisateur: shauctions
+    mot-de-passe: CHANGE_ME
+    # Délai maximal de connexion et de réponse de la base, en millisecondes
+    delai-ms: 3000
+
 # Économie (via Vault)
 economy:
   # Si true, le plugin tentera de se connecter à une économie via Vault.

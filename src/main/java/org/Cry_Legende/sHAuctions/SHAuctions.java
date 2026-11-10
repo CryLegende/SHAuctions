@@ -17,6 +17,9 @@ import org.Cry_Legende.sHAuctions.listener.MenuRefreshListener;
 import org.Cry_Legende.sHAuctions.manager.AuctionManager;
 import org.Cry_Legende.sHAuctions.manager.ChatInputManager;
 import org.Cry_Legende.sHAuctions.manager.PermissionManager;
+import org.Cry_Legende.sHAuctions.manager.SharedFlows;
+import org.Cry_Legende.sHAuctions.network.NetBus;
+import org.Cry_Legende.sHAuctions.network.ShNetworkBus;
 import org.Cry_Legende.sHAuctions.task.ExpirationTask;
 import org.Cry_Legende.sHAuctions.task.RealTimeLoreUpdateTask;
 import org.Cry_Legende.sHAuctions.util.SerializationUtil;
@@ -51,6 +54,8 @@ public class SHAuctions extends JavaPlugin {
     private ExpirationTask expirationTask;
     private MenuRefreshListener menuRefreshListener;
     private RealTimeLoreUpdateTask realTimeLoreUpdateTask;
+    // Mode réseau (SHNetwork présent) : base MariaDB commune, échéances sur le serveur meneur ; null sinon
+    private SharedFlows sharedFlows;
 
     @Override
     public void onEnable() {
@@ -86,7 +91,29 @@ public class SHAuctions extends JavaPlugin {
         }
 
         databaseManager = new DatabaseManager(this);
-        if (!databaseManager.initialize()) {
+        NetBus bus = null;
+        if (networkWanted()) {
+            // Sur le réseau, l'HDV ne retombe jamais sur la base SQLite locale : sur un serveur copié d'un autre, elle
+            // contient des annonces déjà vendues ailleurs.
+            try {
+                bus = ShNetworkBus.open();
+            } catch (RuntimeException | LinkageError e) {
+                getLogger().log(Level.SEVERE, "SHNetwork présent mais inutilisable : HDV désactivé sur ce serveur.", e);
+                getServer().getPluginManager().disablePlugin(this);
+                return;
+            }
+            if (!databaseManager.initializeShared(
+                configManager.getString("reseau.base-de-donnees.url", ""),
+                configManager.getString("reseau.base-de-donnees.utilisateur", ""),
+                configManager.getString("reseau.base-de-donnees.mot-de-passe", ""),
+                Math.max(500, configManager.getInt("reseau.base-de-donnees.delai-ms", 3000)),
+                bus.serverName())) {
+                getLogger().severe("Base partagée du mode réseau indisponible : HDV désactivé sur ce serveur.");
+                getServer().getPluginManager().disablePlugin(this);
+                return;
+            }
+            getLogger().info("SHNetwork détecté : hôtel des ventes commun à tout le réseau (MariaDB).");
+        } else if (!databaseManager.initialize()) {
             getLogger().severe("Critical error: Failed to initialize database. Disabling plugin.");
             getServer().getPluginManager().disablePlugin(this);
             return;
@@ -98,6 +125,11 @@ public class SHAuctions extends JavaPlugin {
         chatInputManager = new ChatInputManager();
         auctionManager = new AuctionManager(this);
         wantedManager = new org.Cry_Legende.sHAuctions.wanted.WantedManager(this);
+        if (bus != null) {
+            sharedFlows = new SharedFlows(this, auctionManager, bus, databaseManager.getSharedAuctions(),
+                configManager.getString("reseau.canal", "shauctions"));
+            auctionManager.setShared(sharedFlows);
+        }
         getLogger().info("Core managers initialized.");
 
         try {
@@ -120,6 +152,9 @@ public class SHAuctions extends JavaPlugin {
         registerDialogs(pm);
         menuRefreshListener = new MenuRefreshListener(this);
         pm.registerEvents(menuRefreshListener, this);
+        if (sharedFlows != null) {
+            sharedFlows.enable();
+        }
         getLogger().info("Listeners registered.");
 
         expirationTask = new ExpirationTask(this);
@@ -159,6 +194,10 @@ public class SHAuctions extends JavaPlugin {
             expirationTask.cancel();
             getLogger().info("ExpirationTask cancelled.");
         }
+        if (sharedFlows != null) {
+            sharedFlows.disable();
+            sharedFlows = null;
+        }
         if (realTimeLoreUpdateTask != null && !realTimeLoreUpdateTask.isCancelled()) {
             realTimeLoreUpdateTask.cancel();
             getLogger().info("RealTimeLoreUpdateTask cancelled.");
@@ -188,6 +227,18 @@ public class SHAuctions extends JavaPlugin {
         getLogger().info(ChatColor.RED + pdf.getName() + " has been disabled.");
         getLogger().info("------------------------------------");
         instance = null;
+    }
+
+    /** Mode réseau voulu : SHNetwork chargé et {@code reseau.actif} vrai (par défaut). */
+    private boolean networkWanted() {
+        return configManager.getBoolean("reseau.actif", true) && getServer().getPluginManager().isPluginEnabled("SHNetwork");
+    }
+
+    /**
+     * Vrai si ce serveur règle les échéances : toujours sur un serveur seul, seulement le meneur en mode réseau.
+     */
+    public boolean isExpiryOwner() {
+        return sharedFlows == null || sharedFlows.isExpiryOwner();
     }
 
     /**
@@ -261,6 +312,10 @@ public class SHAuctions extends JavaPlugin {
     /** Onglet « Recherches » de l'HDV. */
     public org.Cry_Legende.sHAuctions.wanted.WantedManager getWantedManager() {
         return wantedManager;
+    }
+
+    public MenuRefreshListener getMenuRefreshListener() {
+        return menuRefreshListener;
     }
 
     public ChatInputManager getChatInputManager() {

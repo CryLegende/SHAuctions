@@ -47,6 +47,9 @@ public class ExpirationTask extends BukkitRunnable {
             // Le message d'erreur et l'annulation sont déjà gérés dans getAuctionManagerInstance()
             return;
         }
+        if (!plugin.isExpiryOwner()) {
+            return; // mode réseau : seul le serveur meneur règle les échéances et nettoie les invendus
+        }
 
         plugin.getLogger().fine("ExpirationTask running: Checking for expired auctions..."); // "fine" pour moins de spam console
 

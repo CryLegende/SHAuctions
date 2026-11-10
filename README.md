@@ -26,9 +26,22 @@ Les mises en vente, achats, enchères remportées, retraits et annulations du st
 
 Utilisé sur : **Opale**.
 
+## Mode réseau (plusieurs Opale)
+
+Avec **SHNetwork** chargé et `reseau.actif: true` (par défaut), un seul hôtel des ventes sert tous les serveurs du réseau. Sans SHNetwork, rien ne change : base SQLite locale, mêmes commandes, mêmes messages.
+
+- **Stockage** : MariaDB (`reseau.base-de-donnees`), tables `shauctions_auctions`, `shauctions_sold_items`, `shauctions_expired_items`, `shauctions_wanted`, `shauctions_bids` (journal des mises) et `shauctions_state`. Le premier serveur démarré en mode réseau y reprend une fois sa base SQLite, ids compris ; chaque serveur renomme ensuite la sienne en `shauctions.db.avant-reseau`, pour qu'un retour sans SHNetwork ne fasse jamais réapparaître des annonces déjà vendues. Base injoignable : l'HDV se désactive sur ce serveur au lieu de retomber sur SQLite.
+- **Achat** : l'annonce est réservée en base avant tout mouvement d'argent (`UPDATE ... WHERE claim_token IS NULL`) ; un seul serveur l'obtient. Puis l'acheteur paie, le vendeur est payé, et l'annonce est supprimée avec l'écriture de la vente dans une seule transaction. Un échec en route rend l'argent et libère la réservation.
+- **Mise** : l'argent est mis de côté, puis une transaction verrouille l'enchère (`SELECT ... FOR UPDATE`), revérifie toutes les règles (échéance, vendeur, meilleur enchérisseur, minimum, anti-snipe) et rend l'enchérisseur qu'elle remplace : c'est lui qui est remboursé, une fois. Chaque mise prise laisse une ligne dans `shauctions_bids`.
+- **Annulation et échéance** : transaction qui verrouille, supprime et range l'objet ; le remboursement et le paiement du vendeur se calculent sur la ligne verrouillée. Les échéances et le nettoyage des invendus ne tournent que sur le serveur meneur (`leader` SHNetwork, tâche `shauctions-echeances`).
+- **Mise en vente** : l'annonce est écrite réservée (invisible) et ne devient visible qu'une fois l'objet retiré de l'inventaire.
+- **Joueur sur un autre serveur** : surenchère, vente, enchère remportée, remboursement et annulation staff lui sont annoncés par le bus (`reseau.canal`). Les annonces d'enchères et le rafraîchissement des menus ouverts passent par le même canal. Un objet gagné par un joueur connecté sur un autre serveur que le meneur va dans ses invendus (`/hdv expired`).
+- **Opération interrompue** (serveur arrêté brutalement au milieu) : une mise en vente jamais publiée est supprimée après 10 minutes (l'inventaire du vendeur est revenu à sa dernière sauvegarde, l'objet y est) ; un achat interrompu est signalé une fois dans la console du meneur pour une vérification à la main.
+
 ## Dépendances
 
-- Optionnelles : `Vault`, `ViaVersion` (version du client pour choisir dialogue ou chat ; sans lui tous les clients sont considérés compatibles), `SHLogs` (journal des actions, sinon écrit dans la console)
+- Optionnelles : `Vault`, `ViaVersion` (version du client pour choisir dialogue ou chat ; sans lui tous les clients sont considérés compatibles), `SHLogs` (journal des actions, sinon écrit dans la console), `SHNetwork` (mode réseau)
+- Bibliothèques chargées par Paper (`libraries:`) : HikariCP et le pilote MariaDB, utilisés seulement en mode réseau
 
 ## Commandes
 
@@ -61,7 +74,7 @@ Fichiers par défaut repris du serveur (secrets remplacés par `CHANGE_ME`). Cli
 
 <pre>
 plugins/SHAuctions/
-├── <a href="src/main/resources/config.yml">config.yml</a>        dialogues.actif, dialogues.min-protocol (771 = 1.21.6), dialogues.expiration-secondes, section logs (fichier et format de chaque ligne SHLogs)
+├── <a href="src/main/resources/config.yml">config.yml</a>        dialogues.actif, dialogues.min-protocol (771 = 1.21.6), dialogues.expiration-secondes, section logs (fichier et format de chaque ligne SHLogs), section reseau (mode réseau avec SHNetwork)
 ├── <a href="src/main/resources/messages.yml">messages.yml</a>      section dialogues (titres, champs, boutons, erreurs), messages dialog_* et bid_retry_prompt ; les clés manquantes (dont generic_error_occurred) sont ajoutées au fichier du serveur au premier démarrage
 └── menus/
     ├── <a href="src/main/resources/menus/auction_bids.yml">auction_bids.yml</a>
@@ -82,7 +95,7 @@ Java 25 et Maven :
 mvn clean package
 ```
 
-Le jar est généré dans `target/`.
+Le jar est généré dans `target/`. Les tests du mode réseau (une seule réservation, chaque mise remplacée remboursée une fois, échéance réglée une fois, importation) tournent sur une vraie base MariaDB jetable : `SHAU_TEST_URL`, `SHAU_TEST_USER`, `SHAU_TEST_PASSWORD` ; sans elles ils sont ignorés.
 
 ---
 

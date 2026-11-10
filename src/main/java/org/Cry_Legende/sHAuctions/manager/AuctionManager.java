@@ -55,7 +55,9 @@ public class AuctionManager {
     // lorsque plusieurs joueurs enchérissent quasi simultanément.
     private final Object bidLock = new Object();
     // Annonces expirées illisibles déjà signalées : un seul avertissement par annonce, pas un toutes les 5 minutes
-    private final Set<Long> unreadableWarned = new HashSet<>();
+    final Set<Long> unreadableWarned = new HashSet<>();
+    // Mode réseau : achats, mises, annulations et échéances passent par la base partagée (null sur un serveur seul)
+    private SharedFlows shared;
 
     public AuctionManager(SHAuctions plugin) {
         this.plugin = plugin;
@@ -68,17 +70,22 @@ public class AuctionManager {
         this.permissionManager = plugin.getPermissionManager();
     }
 
+    /** Passe l'HDV en mode réseau (appelé une fois, à l'activation). */
+    public void setShared(SharedFlows shared) {
+        this.shared = shared;
+    }
+
     /**
      * L'enchère n'existe plus : les saisies par dialogue qui la visaient sont annulées (sans effet sur la saisie par chat).
      */
-    private void invalidateDialogs(long auctionId) {
+    void invalidateDialogs(long auctionId) {
         DialogManager dialogs = plugin.getDialogManager();
         if (dialogs != null) {
             dialogs.invalidateAuction(auctionId);
         }
     }
 
-    private String getItemNameForMessage(ItemStack item) {
+    String getItemNameForMessage(ItemStack item) {
         if (item == null || item.getType().isAir()) {
             return "Objet Inconnu";
         }
@@ -90,7 +97,7 @@ public class AuctionManager {
      * Écrit une ligne dans SHLogs : fichier et format lus dans la section logs de config.yml,
      * variables passées par paires (nom, valeur).
      */
-    private void writeLog(String key, String defaultFile, String defaultFormat, String... variables) {
+    void writeLog(String key, String defaultFile, String defaultFormat, String... variables) {
         String line = configManager.getString("logs." + key + ".format", defaultFormat);
         for (int i = 0; i + 1 < variables.length; i += 2) {
             line = line.replace(variables[i], String.valueOf(variables[i + 1]));
@@ -101,7 +108,7 @@ public class AuctionManager {
     /**
      * Montant écrit tel quel dans les logs : exact, sans abréviation (1,234,567.5).
      */
-    private static String logPrice(double price) {
+    static String logPrice(double price) {
         return new java.text.DecimalFormat("#,##0.##", java.text.DecimalFormatSymbols.getInstance(Locale.US)).format(price);
     }
 
@@ -147,6 +154,14 @@ public class AuctionManager {
      */
     public void broadcastBidAnnouncement(Player seller, AuctionItem auctionItem) {
         if (auctionItem == null) return;
+        sendBidAnnouncement(seller.getName(), auctionItem);
+        if (shared != null) {
+            shared.announce(seller.getName(), auctionItem);
+        }
+    }
+
+    /** Affiche l'annonce d'une enchère aux joueurs de ce serveur. */
+    void sendBidAnnouncement(String sellerName, AuctionItem auctionItem) {
         ItemStack item = auctionItem.getItemStack();
         String itemName = getItemNameForMessage(item);
 
@@ -162,7 +177,7 @@ public class AuctionManager {
         }
 
         Map<String, String> placeholders = new HashMap<>();
-        placeholders.put("player", seller.getName());
+        placeholders.put("player", sellerName);
         placeholders.put("price", economyProvider.formatCurrencyDetailed(auctionItem.getPrice()));
         // On garde %item_name% littéral pour le remplacer par le composant survolable.
         String template = messageManager.getMessage("bid_announcement", false, placeholders);
@@ -253,11 +268,18 @@ public class AuctionManager {
             return false;
         }
         ItemStack itemToSell = itemInHand.clone();
-        long auctionDbId = auctionDAO.addAuction(seller.getUniqueId(), seller.getName(), itemToSell, price, durationInSeconds);
+        // Mode réseau : l'annonce reste invisible tant que l'objet n'a pas quitté l'inventaire (retrait fait par list)
+        long auctionDbId = shared != null
+            ? shared.list(seller, itemInHand, itemToSell, price, durationInSeconds, AuctionItem.TYPE_SALE)
+            : auctionDAO.addAuction(seller.getUniqueId(), seller.getName(), itemToSell, price, durationInSeconds);
+        if (auctionDbId == SharedFlows.ITEM_NOT_REMOVED) {
+            messageManager.sendMessage(seller, "generic_error_occurred", Collections.singletonMap("error_details", "Item could not be removed from inventory."));
+            return false;
+        }
         if (auctionDbId != -1) {
             ItemStack originalItemToRemove = itemInHand.clone();
             originalItemToRemove.setAmount(itemToSell.getAmount());
-            if (!removeListedItem(seller, originalItemToRemove, auctionDbId)) {
+            if (shared == null && !removeListedItem(seller, originalItemToRemove, auctionDbId)) {
                 messageManager.sendMessage(seller, "generic_error_occurred", Collections.singletonMap("error_details", "Item could not be removed from inventory."));
                 return false;
             }
@@ -341,11 +363,17 @@ public class AuctionManager {
             return false;
         }
         ItemStack itemToSell = itemInHand.clone();
-        long auctionDbId = auctionDAO.addBidAuction(seller.getUniqueId(), seller.getName(), itemToSell, startingPrice, durationInSeconds);
+        long auctionDbId = shared != null
+            ? shared.list(seller, itemInHand, itemToSell, startingPrice, durationInSeconds, AuctionItem.TYPE_BID)
+            : auctionDAO.addBidAuction(seller.getUniqueId(), seller.getName(), itemToSell, startingPrice, durationInSeconds);
+        if (auctionDbId == SharedFlows.ITEM_NOT_REMOVED) {
+            messageManager.sendMessage(seller, "generic_error_occurred", Collections.singletonMap("error_details", "Item could not be removed from inventory."));
+            return false;
+        }
         if (auctionDbId != -1) {
             ItemStack originalItemToRemove = itemInHand.clone();
             originalItemToRemove.setAmount(itemToSell.getAmount());
-            if (!removeListedItem(seller, originalItemToRemove, auctionDbId)) {
+            if (shared == null && !removeListedItem(seller, originalItemToRemove, auctionDbId)) {
                 messageManager.sendMessage(seller, "generic_error_occurred", Collections.singletonMap("error_details", "Item could not be removed from inventory."));
                 return false;
             }
@@ -390,6 +418,9 @@ public class AuctionManager {
      * @return true si l'offre est acceptée et le joueur devient meilleur enchérisseur.
      */
     public boolean placeBid(Player bidder, long auctionId, double amount) {
+        if (shared != null) {
+            return shared.placeBid(bidder, auctionId, amount);
+        }
         synchronized (bidLock) {
             AuctionItem auction = auctionDAO.getAuctionById(auctionId);
             if (auction == null || !auction.isBid()) {
@@ -490,6 +521,9 @@ public class AuctionManager {
     }
 
     public boolean purchaseAuction(Player buyer, long auctionId) {
+        if (shared != null) {
+            return shared.purchase(buyer, auctionId);
+        }
         if (!buyer.hasPermission("shauctions.buy")) {
             messageManager.sendMessage(buyer, "no_permission");
             return false;
@@ -602,6 +636,9 @@ public class AuctionManager {
      *               afin que le vendeur sache que l'item a été annulé par le staff (et non expiré).
      */
     public boolean cancelAuction(Player canceller, long auctionId, boolean isAdminCancel, String reason) {
+        if (shared != null) {
+            return shared.cancel(canceller, auctionId, isAdminCancel, reason);
+        }
         AuctionItem auctionItem = auctionDAO.getAuctionById(auctionId);
         if (auctionItem == null) {
             messageManager.sendMessage(canceller, "item_not_found");
@@ -712,6 +749,10 @@ public class AuctionManager {
     }
 
     public void processExpiredAuctions() { // Appelée par ExpirationTask, sur le thread principal (cf. SHAuctions#onEnable)
+        if (shared != null) {
+            shared.processExpired();
+            return;
+        }
         List<AuctionItem> expiredAuctionsFromDB = auctionDAO.getExpiredAuctions();
         if (expiredAuctionsFromDB.isEmpty()) return;
         plugin.getLogger().fine("Processing " + expiredAuctionsFromDB.size() + " expired auction(s)...");
@@ -953,7 +994,7 @@ public class AuctionManager {
         // TODO: Enchantment blacklist
     }
 
-    private void playSound(Player player, String soundName) {
+    void playSound(Player player, String soundName) {
         if (soundName == null || soundName.trim().isEmpty() || "NONE".equalsIgnoreCase(soundName)) return;
         Sound sound = ConfigManager.sound(soundName);
         if (sound != null) {
@@ -966,7 +1007,7 @@ public class AuctionManager {
     /**
      * Donne l'objet au joueur ; ce qui ne rentre pas tombe à ses pieds au lieu d'être perdu.
      */
-    private void giveOrDrop(Player player, ItemStack item) {
+    void giveOrDrop(Player player, ItemStack item) {
         for (ItemStack leftover : player.getInventory().addItem(item).values()) {
             player.getWorld().dropItemNaturally(player.getLocation(), leftover);
         }
@@ -1002,7 +1043,7 @@ public class AuctionManager {
      * Dernier recours quand un objet ne peut pas être rangé dans les invendus (erreur base) : il est donné au
      * propriétaire s'il est en ligne, sinon écrit dans la console (Base64) pour être restauré à la main.
      */
-    private void rescueItem(UUID ownerUuid, ItemStack item, long auctionId) {
+    void rescueItem(UUID ownerUuid, ItemStack item, long auctionId) {
         Player owner = Bukkit.getPlayer(ownerUuid);
         if (owner != null && owner.isOnline()) {
             giveOrDrop(owner, item.clone());
