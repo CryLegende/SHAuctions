@@ -1,6 +1,7 @@
 package org.Cry_Legende.sHAuctions.serverauction;
 
 import java.time.DayOfWeek;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
@@ -12,11 +13,11 @@ import java.util.List;
 import java.util.Random;
 
 /**
- * Calcul du planning des enchères du serveur, sans dépendance au serveur.
+ * Calcul du planning des enchères et des ventes du serveur, sans dépendance au serveur.
  *
- * <p>Une semaine va du lundi 00:00 au lundi suivant, dans le fuseau du serveur. Les débuts sont tirés dans la plage
- * horaire de chaque jour, répartis sur les jours de la semaine, et chaque enchère reçoit une tranche différente de la
- * plage horaire : deux enchères de la même semaine ne tombent pas au même moment de la journée.</p>
+ * <p>Le planning couvre une semaine (lundi 00:00 au lundi suivant, fuseau du serveur). Chaque jour reçoit un nombre
+ * tiré entre un minimum et un maximum ; les débuts sont tirés dans la plage horaire du jour, un par tranche égale de
+ * la plage (ils ne se tassent pas), avec un écart minimal entre eux et avec ceux de l'autre type.</p>
  */
 public final class ServerAuctionPlanner {
 
@@ -26,20 +27,22 @@ public final class ServerAuctionPlanner {
     }
 
     /**
-     * Réglages du planning (section encheres-serveur de config.yml).
+     * Réglages du planning d'un type (section encheres-serveur ou ventes-serveur de config.yml).
      *
-     * @param perWeek            enchères par semaine
+     * @param minPerDay          nombre minimal par jour
+     * @param maxPerDay          nombre maximal par jour
      * @param windowStart        début de la plage horaire des débuts
      * @param windowEnd          fin de la plage horaire (avant le début : la plage passe minuit)
-     * @param minGapMinutes      écart minimal entre deux débuts
-     * @param minDurationMinutes durée minimale d'une enchère
-     * @param maxDurationMinutes durée maximale d'une enchère
+     * @param minGapMinutes      écart minimal entre deux débuts de ce type, et avec les débuts de l'autre type
+     * @param minDurationMinutes durée minimale
+     * @param maxDurationMinutes durée maximale
      */
-    public record Settings(int perWeek, LocalTime windowStart, LocalTime windowEnd, int minGapMinutes,
+    public record Settings(int minPerDay, int maxPerDay, LocalTime windowStart, LocalTime windowEnd, int minGapMinutes,
                            int minDurationMinutes, int maxDurationMinutes) {
 
         public Settings {
-            perWeek = Math.max(0, perWeek);
+            minPerDay = Math.max(0, minPerDay);
+            maxPerDay = Math.max(minPerDay, maxPerDay);
             minGapMinutes = Math.max(0, minGapMinutes);
             minDurationMinutes = Math.max(1, minDurationMinutes);
             maxDurationMinutes = Math.max(minDurationMinutes, maxDurationMinutes);
@@ -53,11 +56,11 @@ public final class ServerAuctionPlanner {
 
         /** Empreinte des réglages : un planning fait avec d'autres réglages est refait. */
         public String signature() {
-            return perWeek + "|" + windowStart + "|" + windowEnd + "|" + minGapMinutes + "|" + minDurationMinutes + "|" + maxDurationMinutes;
+            return minPerDay + "-" + maxPerDay + "|" + windowStart + "|" + windowEnd + "|" + minGapMinutes + "|" + minDurationMinutes + "|" + maxDurationMinutes;
         }
     }
 
-    /** Une enchère prévue : début (secondes epoch) et durée (secondes). */
+    /** Un début prévu : instant (secondes epoch) et durée (secondes). */
     public record Slot(long start, long durationSeconds) {
     }
 
@@ -104,103 +107,57 @@ public final class ServerAuctionPlanner {
         return result;
     }
 
-    /** Enchères à prévoir de {@code from} à la fin de la semaine : le nombre par semaine au prorata de la plage restante. */
-    public static int countFor(Settings settings, ZonedDateTime weekStart, long from) {
-        if (settings.perWeek() <= 0) {
-            return 0;
-        }
-        long remaining = 0;
+    /**
+     * Tire les débuts d'un type pour chaque jour restant de la semaine : entre {@code minPerDay} et {@code maxPerDay}
+     * par jour (au prorata pour le jour déjà entamé). Si l'écart minimal ne permet pas d'en placer autant dans un jour,
+     * ce jour en reçoit moins.
+     *
+     * @param sameKind  débuts déjà pris de ce type : ils comptent dans le nombre de leur jour et pour l'écart
+     * @param otherKind débuts de l'autre type : l'écart minimal est aussi gardé avec eux
+     * @return les débuts prévus, dans l'ordre
+     */
+    public static List<Slot> plan(Settings settings, ZonedDateTime weekStart, long from, List<Long> sameKind, List<Long> otherKind, Random random) {
+        List<Long> taken = new ArrayList<>(sameKind);
+        List<Slot> slots = new ArrayList<>();
         for (Window window : windows(settings, weekStart, from)) {
-            remaining += window.to() - window.from();
+            int drawn = settings.minPerDay() + random.nextInt(settings.maxPerDay() - settings.minPerDay() + 1);
+            double share = (double) (window.to() - window.from()) / (window.fullEnd() - window.fullStart());
+            int count = share >= 1 ? drawn : (int) Math.round(drawn * share);
+            for (long start : sameKind) {
+                if (start >= window.fullStart() && start < window.fullEnd()) {
+                    count--;
+                }
+            }
+            List<Long> starts = placeInDay(settings, window, Math.max(0, count), taken, otherKind, random);
+            for (long start : starts) {
+                int minutes = settings.minDurationMinutes()
+                    + random.nextInt(settings.maxDurationMinutes() - settings.minDurationMinutes() + 1);
+                slots.add(new Slot(start, minutes * 60L));
+                taken.add(start);
+            }
         }
-        double full = 7.0 * settings.windowMinutes() * 60;
-        return (int) Math.min(settings.perWeek(), Math.round(settings.perWeek() * remaining / full));
+        return slots;
     }
 
-    /**
-     * Tire les débuts de {@code count} enchères entre {@code from} et la fin de la semaine. Si l'écart minimal ne
-     * permet pas d'en placer autant, le planning en contient moins.
-     *
-     * @param taken débuts déjà pris cette semaine : l'écart minimal est aussi respecté avec eux
-     * @return les enchères prévues, dans l'ordre
-     */
-    public static List<Slot> plan(Settings settings, ZonedDateTime weekStart, long from, int count, List<Long> taken, Random random) {
-        List<Window> windows = windows(settings, weekStart, from);
-        for (int n = count; n > 0 && !windows.isEmpty(); n--) {
+    /** Débuts d'un jour : un par tranche égale de ce qui reste de la plage, écarts vérifiés, moins s'il le faut. */
+    private static List<Long> placeInDay(Settings settings, Window window, int count, List<Long> taken, List<Long> others, Random random) {
+        for (int n = count; n > 0; n--) {
             for (int attempt = 0; attempt < ATTEMPTS; attempt++) {
-                List<Long> starts = draw(settings, windows, n, random);
-                List<Long> all = new ArrayList<>(starts);
-                all.addAll(taken);
-                if (starts.size() == n && respectsGap(all, settings.minGapMinutes())) {
-                    List<Slot> slots = new ArrayList<>();
-                    for (long start : starts) {
-                        int minutes = settings.minDurationMinutes()
-                            + random.nextInt(settings.maxDurationMinutes() - settings.minDurationMinutes() + 1);
-                        slots.add(new Slot(start, minutes * 60L));
+                List<Long> starts = new ArrayList<>();
+                long length = window.to() - window.from();
+                for (int i = 0; i < n; i++) {
+                    Long start = randomMinute(window.from() + length * i / n, window.from() + length * (i + 1) / n, random);
+                    if (start == null) {
+                        break;
                     }
-                    return slots;
+                    starts.add(start);
+                }
+                if (starts.size() == n && fits(starts, taken, others, settings.minGapMinutes())) {
+                    return starts;
                 }
             }
         }
         return List.of();
-    }
-
-    /**
-     * Un tirage : les enchères sont réparties sur les jours (au plus une par jour tant qu'il y a plus de jours que
-     * d'enchères, réparties sur toute la semaine), puis chacune reçoit sa propre tranche de la plage horaire.
-     */
-    private static List<Long> draw(Settings settings, List<Window> windows, int count, Random random) {
-        int days = windows.size();
-        int[] perDay = new int[days];
-        if (count <= days) {
-            // Jours découpés en `count` groupes consécutifs, un jour tiré dans chaque groupe
-            for (int g = 0; g < count; g++) {
-                int lo = g * days / count;
-                int hi = (g + 1) * days / count;
-                perDay[lo + random.nextInt(hi - lo)]++;
-            }
-        } else {
-            List<Integer> order = new ArrayList<>();
-            for (int d = 0; d < days; d++) {
-                perDay[d] = count / days;
-                order.add(d);
-            }
-            Collections.shuffle(order, random);
-            for (int i = 0; i < count % days; i++) {
-                perDay[order.get(i)]++;
-            }
-        }
-
-        // Tranches de la plage horaire, une par enchère. Chaque enchère a une place idéale dans la plage : celles d'un
-        // même jour sont réparties sur toute la plage, avec un décalage tiré au hasard pour chaque jour. Les tranches
-        // sont distribuées dans l'ordre de ces places : toutes différentes, et espacées pour celles d'un même jour.
-        List<double[]> places = new ArrayList<>();
-        for (int d = 0; d < days; d++) {
-            double offset = random.nextDouble();
-            for (int k = 0; k < perDay[d]; k++) {
-                places.add(new double[]{(k + offset) / perDay[d], d, random.nextDouble()});
-            }
-        }
-        places.sort((x, y) -> x[0] != y[0] ? Double.compare(x[0], y[0]) : Double.compare(x[2], y[2]));
-
-        long windowSeconds = settings.windowMinutes() * 60L;
-        List<Long> starts = new ArrayList<>();
-        for (int band = 0; band < places.size(); band++) {
-            Window window = windows.get((int) places.get(band)[1]);
-            long bandFrom = window.fullStart() + windowSeconds * band / count;
-            long bandTo = window.fullStart() + windowSeconds * (band + 1) / count;
-            Long start = randomMinute(Math.max(bandFrom, window.from()), Math.min(bandTo, window.to()), random);
-            if (start == null) {
-                // Tranche déjà passée (premier jour entamé) : n'importe où dans ce qui reste du jour
-                start = randomMinute(window.from(), window.to(), random);
-            }
-            if (start == null) {
-                return List.of();
-            }
-            starts.add(start);
-        }
-        Collections.sort(starts);
-        return starts;
     }
 
     /** Minute ronde tirée dans [from, to), ou null s'il n'y en a aucune. */
@@ -211,6 +168,23 @@ public final class ServerAuctionPlanner {
             return null;
         }
         return first + 60L * random.nextInt((int) ((last - first) / 60 + 1));
+    }
+
+    /** Écart minimal gardé entre les nouveaux débuts, avec ceux déjà pris et avec ceux de l'autre type. */
+    static boolean fits(List<Long> starts, List<Long> taken, List<Long> others, int gapMinutes) {
+        List<Long> same = new ArrayList<>(starts);
+        same.addAll(taken);
+        if (!respectsGap(same, gapMinutes)) {
+            return false;
+        }
+        for (long start : starts) {
+            for (long other : others) {
+                if (Math.abs(start - other) < gapMinutes * 60L) {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
 
     /** Vrai si deux débuts consécutifs sont toujours séparés d'au moins {@code gapMinutes}. */
@@ -226,11 +200,11 @@ public final class ServerAuctionPlanner {
     }
 
     /**
-     * Fin de la plage horaire qui contient {@code epoch}, ou -1 s'il est hors plage. Une enchère dont l'heure est
-     * passée pendant que le serveur était éteint n'est lancée en retard que dans la même plage.
+     * Fin de la plage horaire qui contient {@code epoch}, ou -1 s'il est hors plage. Un début passé pendant que le
+     * serveur était éteint n'est lancé en retard que dans la même plage.
      */
     public static long windowEndContaining(Settings settings, long epoch, ZoneId zone) {
-        LocalDate day = ZonedDateTime.ofInstant(java.time.Instant.ofEpochSecond(epoch), zone).toLocalDate();
+        LocalDate day = ZonedDateTime.ofInstant(Instant.ofEpochSecond(epoch), zone).toLocalDate();
         for (LocalDate candidate : new LocalDate[]{day, day.minusDays(1)}) {
             long[] window = windowOf(settings, candidate, zone);
             if (epoch >= window[0] && epoch < window[1]) {
@@ -238,13 +212,5 @@ public final class ServerAuctionPlanner {
             }
         }
         return -1;
-    }
-
-    /**
-     * Plafond hebdomadaire : un joueur peut miser sur une enchère du serveur tant que ses enchères remportées cette
-     * semaine plus celles où il est déjà en tête restent sous le plafond (0 = sans plafond).
-     */
-    public static boolean mayBid(int wonThisWeek, int leadingElsewhere, int cap) {
-        return cap <= 0 || wonThisWeek + leadingElsewhere < cap;
     }
 }

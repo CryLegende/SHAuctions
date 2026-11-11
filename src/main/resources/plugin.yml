@@ -16,7 +16,7 @@ commands:
     usage: "/hdv [sell|bid|encheres|history|expired|ownsales|recherche]"
     aliases: [ah, auctionhouse]
   shauctions:
-    description: Administration de SHAuctions (reload, info, enchères du serveur).
+    description: Administration de SHAuctions (reload, info, enchères et ventes du serveur).
     usage: /shauctions <reload|info|plan|launch|skip>
     permission: shauctions.admin.reload;shauctions.admin.info;shauctions.admin.plan;shauctions.admin.launch;shauctions.admin.skip
 
@@ -79,13 +79,13 @@ permissions:
     description: Voir les ventes, enchères et invendus d'un joueur (/shauctions info).
     default: op
   shauctions.admin.plan:
-    description: Voir le planning de la semaine des enchères du serveur (/shauctions plan).
+    description: Voir le planning de la semaine des enchères et ventes du serveur (/shauctions plan).
     default: op
   shauctions.admin.launch:
-    description: Lancer tout de suite une enchère du serveur (/shauctions launch).
+    description: Lancer tout de suite une enchère ou une vente du serveur (/shauctions launch).
     default: op
   shauctions.admin.skip:
-    description: Retirer du planning la prochaine enchère du serveur (/shauctions skip).
+    description: Retirer du planning la prochaine enchère ou vente du serveur (/shauctions skip).
     default: op
   shauctions.recherches.use:
     description: Onglet Recherches de l'HDV (voir, publier, contacter, supprimer les siennes).

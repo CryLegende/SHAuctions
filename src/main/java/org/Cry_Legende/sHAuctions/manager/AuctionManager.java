@@ -165,7 +165,7 @@ public class AuctionManager {
     /** Affiche l'annonce d'une enchère aux joueurs de ce serveur. */
     void sendBidAnnouncement(String sellerName, AuctionItem auctionItem) {
         if (auctionItem.isServerAuction()) {
-            plugin.getServerAuctions().sendStartAnnouncement(auctionItem);
+            plugin.getServerAuctions().sendAnnouncement(auctionItem);
             return;
         }
         ItemStack item = auctionItem.getItemStack();
@@ -230,6 +230,23 @@ public class AuctionManager {
             message.addExtra(part);
         }
         return message;
+    }
+
+    /**
+     * Remet le lot d'une vente du serveur à son acheteur : par ses commandes s'il a une place libre, sinon dans ses
+     * invendus (commandes lancées quand il le récupère).
+     *
+     * @return vrai si le lot a été remis tout de suite
+     */
+    boolean deliverServerSale(Player buyer, ItemStack item, long auctionId) {
+        if (buyer.getInventory().firstEmpty() != -1 && plugin.getServerAuctions().deliver(buyer, item, auctionId)) {
+            return true;
+        }
+        if (!expiredItemDAO.addExpiredItem(auctionId, buyer.getUniqueId(), buyer.getName(), item.clone(), System.currentTimeMillis() / 1000L)) {
+            rescueItem(buyer.getUniqueId(), item, auctionId);
+            return true;
+        }
+        return false;
     }
 
     /**
@@ -481,9 +498,6 @@ public class AuctionManager {
                 messageManager.sendMessage(bidder, "bid_too_low", Collections.singletonMap("min_bid", economyProvider.formatCurrency(minRequired)));
                 return false;
             }
-            if (!plugin.getServerAuctions().mayBid(bidder, auction)) {
-                return false;
-            }
             if (!economyProvider.isEconomyReady()) {
                 messageManager.sendMessage(bidder, "economy_disabled_error");
                 return false;
@@ -582,6 +596,8 @@ public class AuctionManager {
             messageManager.sendMessage(buyer, "item_not_found_or_expired");
             return false;
         }
+        // Vente du serveur : le prix n'est versé à personne, et un inventaire plein envoie le lot dans les invendus
+        final boolean server = auctionItem.isServerAuction();
         if (!economyProvider.isEconomyReady()) {
             messageManager.sendMessage(buyer, "economy_disabled_error");
             return false;
@@ -590,7 +606,7 @@ public class AuctionManager {
             messageManager.sendMessage(buyer, "not_enough_money", Collections.singletonMap("price", economyProvider.formatCurrency(auctionItem.getPrice())));
             return false;
         }
-        if (buyer.getInventory().firstEmpty() == -1) {
+        if (!server && buyer.getInventory().firstEmpty() == -1) {
             messageManager.sendMessage(buyer, "inventory_full");
             return false;
         }
@@ -608,7 +624,7 @@ public class AuctionManager {
             return false;
         }
         OfflinePlayer seller = Bukkit.getOfflinePlayer(auctionItem.getSellerUuid());
-        if (!economyProvider.deposit(seller, auctionItem.getPrice())) {
+        if (!server && !economyProvider.deposit(seller, auctionItem.getPrice())) {
             economyProvider.deposit(buyer, auctionItem.getPrice());
             plugin.getLogger().severe("Critical error: Failed to deposit money to seller " + seller.getName() + " (UUID: " + seller.getUniqueId() + ") after successful withdrawal from buyer " + buyer.getName() + " for auction " + auctionId + ". Buyer was refunded.");
             messageManager.sendMessage(buyer, "generic_error_occurred", Collections.singletonMap("error_details", "Economy deposit to seller failed."));
@@ -618,7 +634,7 @@ public class AuctionManager {
         // L'annonce n'est retirée qu'une fois : si elle a déjà disparu (ou erreur base), les deux virements
         // sont annulés et rien n'est donné (sinon objet livré ET toujours en vente).
         if (!auctionDAO.removeAuction(auctionId)) {
-            if (!economyProvider.withdraw(seller, auctionItem.getPrice())) {
+            if (!server && !economyProvider.withdraw(seller, auctionItem.getPrice())) {
                 plugin.getLogger().severe("Critical error: auction " + auctionId + " could not be removed and " + economyProvider.formatCurrency(auctionItem.getPrice())
                     + " could not be taken back from seller " + seller.getUniqueId() + ". Manual check needed.");
             }
@@ -628,7 +644,10 @@ public class AuctionManager {
             return false;
         }
         invalidateDialogs(auctionId);
-        giveOrDrop(buyer, purchasedItemStack.clone());
+        boolean sentToExpired = server && !deliverServerSale(buyer, purchasedItemStack, auctionId);
+        if (!server) {
+            giveOrDrop(buyer, purchasedItemStack.clone());
+        }
         String itemNameForMsgsAndLogs = getItemNameForMessage(purchasedItemStack);
         writeLog("achats", "achats", "%buyer% -> achète %amount% x %item% à %seller% (%price% SHCoins)",
             "%buyer%", buyer.getName(),
@@ -637,8 +656,9 @@ public class AuctionManager {
             "%item%", itemNameForMsgsAndLogs,
             "%price%", logPrice(auctionItem.getPrice())
         );
-        boolean sellerOnline = seller.isOnline() && seller.getPlayer() != null;
-        soldItemDAO.addSoldItem(auctionId, auctionItem.getSellerUuid(), auctionItem.getSellerName(), buyer.getUniqueId(), buyer.getName(), itemNameForMsgsAndLogs, purchasedItemStack, auctionItem.getPrice(), "SALE", sellerOnline);
+        boolean sellerOnline = !server && seller.isOnline() && seller.getPlayer() != null;
+        soldItemDAO.addSoldItem(auctionId, auctionItem.getSellerUuid(), auctionItem.getSellerName(), buyer.getUniqueId(), buyer.getName(), itemNameForMsgsAndLogs, purchasedItemStack, auctionItem.getPrice(), "SALE",
+            server || sellerOnline);
 
         Map<String, String> buyerPlaceholders = new HashMap<>();
         buyerPlaceholders.put("item_name", itemNameForMsgsAndLogs);
@@ -646,6 +666,9 @@ public class AuctionManager {
         buyerPlaceholders.put("seller", auctionItem.getSellerName());
         messageManager.sendMessage(buyer, "item_purchased_successfully", buyerPlaceholders);
         playSound(buyer, configManager.getString("misc.sound_on_purchase"));
+        if (sentToExpired) {
+            messageManager.sendMessage(buyer, "server_sale_sent_to_expired", Collections.singletonMap("item_name", itemNameForMsgsAndLogs));
+        }
         if (sellerOnline) {
             Map<String, String> sellerPlaceholders = new HashMap<>();
             sellerPlaceholders.put("item_name", itemNameForMsgsAndLogs);

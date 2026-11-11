@@ -198,6 +198,7 @@ public final class SharedFlows {
         o.addProperty("id", auction.getId());
         o.addProperty("price", auction.getPrice());
         o.addProperty("expire", auction.getExpireTimestamp());
+        o.addProperty("kind", auction.getType());
         o.addProperty("item", item);
         bus.publish(channel, o);
     }
@@ -250,8 +251,9 @@ public final class SharedFlows {
                 }
                 case "announce" -> {
                     long expire = o.has("expire") ? o.get("expire").getAsLong() : 0L;
+                    String kind = text(o, "kind") != null ? text(o, "kind") : AuctionItem.TYPE_BID;
                     AuctionItem auction = new AuctionItem(o.get("id").getAsLong(), UUID.fromString(text(o, "sellerUuid")), text(o, "seller"),
-                        text(o, "item"), o.get("price").getAsDouble(), 0L, expire, AuctionItem.TYPE_BID, -1, null, null);
+                        text(o, "item"), o.get("price").getAsDouble(), 0L, expire, kind, -1, null, null);
                     am.sendBidAnnouncement(text(o, "seller"), auction);
                 }
                 case "broadcast" -> {
@@ -338,6 +340,8 @@ public final class SharedFlows {
             messages().sendMessage(buyer, "item_not_found_or_expired");
             return false;
         }
+        // Vente du serveur : le prix n'est versé à personne, et un inventaire plein envoie le lot dans les invendus
+        boolean server = listed.isServerAuction();
         if (!economy().isEconomyReady()) {
             messages().sendMessage(buyer, "economy_disabled_error");
             return false;
@@ -346,7 +350,7 @@ public final class SharedFlows {
             messages().sendMessage(buyer, "not_enough_money", Collections.singletonMap("price", economy().formatCurrency(listed.getPrice())));
             return false;
         }
-        if (buyer.getInventory().firstEmpty() == -1) {
+        if (!server && buyer.getInventory().firstEmpty() == -1) {
             messages().sendMessage(buyer, "inventory_full");
             return false;
         }
@@ -385,7 +389,7 @@ public final class SharedFlows {
             return false;
         }
         OfflinePlayer seller = Bukkit.getOfflinePlayer(auction.getSellerUuid());
-        if (!economy().deposit(seller, price)) {
+        if (!server && !economy().deposit(seller, price)) {
             economy().deposit(buyer, price);
             auctions.releaseClaim(auctionId, token);
             plugin.getLogger().severe("Critical error: Failed to deposit money to seller " + auction.getSellerName() + " (UUID: " + auction.getSellerUuid()
@@ -399,11 +403,11 @@ public final class SharedFlows {
         boolean sellerHere = local(auction.getSellerUuid()) != null;
         boolean sellerElsewhere = !sellerHere && elsewhere(auction.getSellerUuid());
         Sale sale = new Sale(auctionId, auction.getSellerUuid(), auction.getSellerName(), buyer.getUniqueId(), buyer.getName(), itemName,
-            auction.getItemSerialized(), price, AuctionItem.TYPE_SALE, sellerHere || sellerElsewhere);
+            auction.getItemSerialized(), price, AuctionItem.TYPE_SALE, server || sellerHere || sellerElsewhere);
         Boolean finalized = finalizePurchase(auctionId, token, sale);
         if (Boolean.FALSE.equals(finalized)) {
             // La réservation a disparu sans nous : rien n'est livré, les deux virements sont repris
-            if (!economy().withdraw(seller, price)) {
+            if (!server && !economy().withdraw(seller, price)) {
                 plugin.getLogger().severe("Critical error: auction " + auctionId + " lost its reservation and " + economy().formatCurrency(price)
                     + " could not be taken back from seller " + auction.getSellerUuid() + ". Manual check needed.");
             }
@@ -418,7 +422,10 @@ public final class SharedFlows {
 
         // 4. Livraison et avis
         am.invalidateDialogs(auctionId);
-        am.giveOrDrop(buyer, item.clone());
+        boolean sentToExpired = server && !am.deliverServerSale(buyer, item, auctionId);
+        if (!server) {
+            am.giveOrDrop(buyer, item.clone());
+        }
         am.writeLog("achats", "achats", "%buyer% -> achète %amount% x %item% à %seller% (%price% SHCoins)",
             "%buyer%", buyer.getName(),
             "%seller%", auction.getSellerName(),
@@ -431,10 +438,15 @@ public final class SharedFlows {
         buyerPh.put("seller", auction.getSellerName());
         messages().sendMessage(buyer, "item_purchased_successfully", buyerPh);
         am.playSound(buyer, config().getString("misc.sound_on_purchase"));
-        Map<String, String> sellerPh = new HashMap<>();
-        sellerPh.put("item_name", itemName);
-        sellerPh.put("price", economy().formatCurrency(price));
-        notify(auction.getSellerUuid(), "item_sold_successfully", sellerPh, "misc.sound_on_sell");
+        if (sentToExpired) {
+            messages().sendMessage(buyer, "server_sale_sent_to_expired", Collections.singletonMap("item_name", itemName));
+        }
+        if (!server) {
+            Map<String, String> sellerPh = new HashMap<>();
+            sellerPh.put("item_name", itemName);
+            sellerPh.put("price", economy().formatCurrency(price));
+            notify(auction.getSellerUuid(), "item_sold_successfully", sellerPh, "misc.sound_on_sell");
+        }
         if (config().getBoolean("misc.log_transactions", true)) {
             plugin.getLogger().info(String.format("ACHAT: %s a acheté %d x %s de %s pour %s. (ID Enchère: %d)", buyer.getName(), item.getAmount(),
                 itemName, auction.getSellerName(), economy().formatCurrency(price), auctionId));
@@ -493,9 +505,6 @@ public final class SharedFlows {
         double minRequired = auction.hasBid() ? auction.getHighestBid() + minIncrement : auction.getStartingPrice();
         if (amount < minRequired) {
             messages().sendMessage(bidder, "bid_too_low", Collections.singletonMap("min_bid", economy().formatCurrency(minRequired)));
-            return false;
-        }
-        if (!plugin.getServerAuctions().mayBid(bidder, auction)) {
             return false;
         }
         if (!economy().isEconomyReady()) {

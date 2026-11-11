@@ -15,16 +15,28 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Random;
 
 /**
- * Planning de la semaine en cours, gardé dans encheres-serveur.yml : il survit aux redémarrages et n'est refait qu'à
- * la semaine suivante ou quand les réglages du planning changent.
+ * Planning de la semaine en cours (enchères et ventes du serveur), gardé dans encheres-serveur.yml : il survit aux
+ * redémarrages et n'est refait qu'à la semaine suivante ou quand les réglages du planning changent.
  */
 public final class ServerAuctionSchedule {
 
-    /** État d'une enchère du planning. */
+    /** Enchère ou vente du serveur. */
+    public enum Kind {
+        ENCHERE,
+        VENTE;
+
+        /** Nom court (fichier, commandes) : enchere, vente. */
+        public String id() {
+            return name().toLowerCase(Locale.ROOT);
+        }
+    }
+
+    /** État d'une entrée du planning. */
     public enum Status {
         /** pas encore lancée */
         PREVUE,
@@ -36,8 +48,9 @@ public final class ServerAuctionSchedule {
         MANQUEE
     }
 
-    /** Une enchère du planning. */
+    /** Une entrée du planning. */
     public static final class Entry {
+        private final Kind kind;
         private final long start;
         private final long duration;
         private Status status;
@@ -45,11 +58,16 @@ public final class ServerAuctionSchedule {
         private long auctionId = -1;
         private final boolean forced;
 
-        Entry(long start, long duration, Status status, boolean forced) {
+        Entry(Kind kind, long start, long duration, Status status, boolean forced) {
+            this.kind = kind;
             this.start = start;
             this.duration = duration;
             this.status = status;
             this.forced = forced;
+        }
+
+        public Kind kind() {
+            return kind;
         }
 
         public long start() {
@@ -77,14 +95,14 @@ public final class ServerAuctionSchedule {
             return forced;
         }
 
-        /** Enchère mise en ligne. */
+        /** Mise en ligne. */
         public void launched(String lotId, long id) {
             this.status = Status.LANCEE;
             this.lot = lotId;
             this.auctionId = id;
         }
 
-        /** Enchère qui n'a pas pu être lancée. */
+        /** N'a pas pu être lancée. */
         public void missed() {
             this.status = Status.MANQUEE;
         }
@@ -98,64 +116,74 @@ public final class ServerAuctionSchedule {
         return week;
     }
 
-    /** Toutes les enchères de la semaine, dans l'ordre. */
+    /** Toutes les entrées de la semaine, dans l'ordre. */
     public List<Entry> entries() {
         return List.copyOf(entries);
+    }
+
+    private static String signature(Settings auctions, Settings sales) {
+        return (auctions == null ? "-" : auctions.signature()) + "#" + (sales == null ? "-" : sales.signature());
     }
 
     /**
      * Fait le planning d'une nouvelle semaine, ou refait la suite de la semaine si les réglages ont changé.
      *
+     * @param auctions réglages des enchères, null si elles sont désactivées
+     * @param sales    réglages des ventes, null si elles sont désactivées
      * @return vrai si le planning a changé (à enregistrer)
      */
-    public boolean refresh(Settings settings, ZonedDateTime now, Random random) {
+    public boolean refresh(Settings auctions, Settings sales, ZonedDateTime now, Random random) {
         ZonedDateTime weekStart = ServerAuctionPlanner.weekStart(now);
         String key = ServerAuctionPlanner.weekKey(weekStart);
+        String wanted = signature(auctions, sales);
+        if (key.equals(week) && wanted.equals(signature)) {
+            return false;
+        }
         long from = now.toEpochSecond();
         if (!key.equals(week)) {
             week = key;
-            signature = settings.signature();
             entries.clear();
-            add(ServerAuctionPlanner.plan(settings, weekStart, from, ServerAuctionPlanner.countFor(settings, weekStart, from), List.of(), random));
-            return true;
+        } else {
+            // Réglages changés : ce qui est à venir est retiré et replanifié, le reste demeure
+            entries.removeIf(e -> e.status == Status.PREVUE && e.start >= from);
         }
-        if (settings.signature().equals(signature)) {
-            return false;
+        signature = wanted;
+        if (auctions != null) {
+            add(Kind.ENCHERE, ServerAuctionPlanner.plan(auctions, weekStart, from, planned(Kind.ENCHERE), planned(Kind.VENTE), random));
         }
-        // Réglages changés : les enchères à venir sont retirées et replanifiées, les autres restent
-        signature = settings.signature();
-        entries.removeIf(e -> e.status == Status.PREVUE && e.start >= from);
-        int consumed = 0;
-        List<Long> taken = new ArrayList<>();
-        for (Entry entry : entries) {
-            if (!entry.forced) {
-                consumed++;
-            }
-            if (entry.status == Status.LANCEE || entry.status == Status.PREVUE) {
-                taken.add(entry.start);
-            }
+        if (sales != null) {
+            add(Kind.VENTE, ServerAuctionPlanner.plan(sales, weekStart, from, planned(Kind.VENTE), planned(Kind.ENCHERE), random));
         }
-        int count = Math.min(Math.max(0, settings.perWeek() - consumed), ServerAuctionPlanner.countFor(settings, weekStart, from));
-        add(ServerAuctionPlanner.plan(settings, weekStart, from, count, taken, random));
         return true;
     }
 
-    private void add(List<Slot> slots) {
+    /** Débuts du planning (hors lancements à la main) d'un type, sauf ceux retirés. */
+    private List<Long> planned(Kind kind) {
+        List<Long> starts = new ArrayList<>();
+        for (Entry entry : entries) {
+            if (entry.kind == kind && !entry.forced && entry.status != Status.ANNULEE) {
+                starts.add(entry.start);
+            }
+        }
+        return starts;
+    }
+
+    private void add(Kind kind, List<Slot> slots) {
         for (Slot slot : slots) {
-            entries.add(new Entry(slot.start(), slot.durationSeconds(), Status.PREVUE, false));
+            entries.add(new Entry(kind, slot.start(), slot.durationSeconds(), Status.PREVUE, false));
         }
         entries.sort(Comparator.comparingLong(Entry::start));
     }
 
-    /** Enchères dont l'heure est arrivée : à lancer maintenant, ou manquées. */
+    /** Entrées dont l'heure est arrivée : à lancer maintenant, ou manquées. */
     public record Due(List<Entry> toLaunch, List<Entry> missed) {
     }
 
     /**
-     * Enchères prévues dont l'heure est arrivée. Celle dont la plage horaire est déjà finie (serveur éteint à ce
-     * moment-là) passe en {@link Status#MANQUEE} ; les autres sont rendues pour être lancées.
+     * Entrées prévues dont l'heure est arrivée. Celle dont la plage horaire est déjà finie (serveur éteint à ce
+     * moment-là), ou dont le type a été désactivé, passe en {@link Status#MANQUEE} ; les autres sont à lancer.
      */
-    public Due due(Settings settings, ZonedDateTime now) {
+    public Due due(Settings auctions, Settings sales, ZonedDateTime now) {
         long nowSeconds = now.toEpochSecond();
         List<Entry> toLaunch = new ArrayList<>();
         List<Entry> missed = new ArrayList<>();
@@ -163,7 +191,8 @@ public final class ServerAuctionSchedule {
             if (entry.status != Status.PREVUE || entry.start > nowSeconds) {
                 continue;
             }
-            long end = ServerAuctionPlanner.windowEndContaining(settings, entry.start, now.getZone());
+            Settings settings = entry.kind == Kind.ENCHERE ? auctions : sales;
+            long end = settings == null ? -1 : ServerAuctionPlanner.windowEndContaining(settings, entry.start, now.getZone());
             if (end > nowSeconds) {
                 toLaunch.add(entry);
             } else {
@@ -174,28 +203,28 @@ public final class ServerAuctionSchedule {
         return new Due(toLaunch, missed);
     }
 
-    /** Prochaine enchère prévue, ou null. */
-    public Entry next() {
+    /** Prochaine entrée prévue (du type donné, ou de n'importe quel type si null), ou null. */
+    public Entry next(Kind kind) {
         for (Entry entry : entries) {
-            if (entry.status == Status.PREVUE) {
+            if (entry.status == Status.PREVUE && (kind == null || entry.kind == kind)) {
                 return entry;
             }
         }
         return null;
     }
 
-    /** Retire la prochaine enchère prévue. @return l'enchère retirée, ou null s'il n'y en a plus */
-    public Entry skipNext() {
-        Entry entry = next();
+    /** Retire la prochaine entrée prévue (du type donné, ou de n'importe quel type si null). @return l'entrée, ou null */
+    public Entry skipNext(Kind kind) {
+        Entry entry = next(kind);
         if (entry != null) {
             entry.status = Status.ANNULEE;
         }
         return entry;
     }
 
-    /** Ajoute une enchère lancée à la main (hors planning, ne compte pas dans le nombre par semaine). */
-    public Entry addForced(long start, long duration, String lotId, long auctionId) {
-        Entry entry = new Entry(start, duration, Status.PREVUE, true);
+    /** Ajoute une enchère ou une vente lancée à la main (hors planning, ne compte pas dans le nombre par jour). */
+    public Entry addForced(Kind kind, long start, long duration, String lotId, long auctionId) {
+        Entry entry = new Entry(kind, start, duration, Status.PREVUE, true);
         entry.launched(lotId, auctionId);
         entries.add(entry);
         entries.sort(Comparator.comparingLong(Entry::start));
@@ -206,12 +235,13 @@ public final class ServerAuctionSchedule {
 
     public String toYaml() {
         YamlConfiguration yaml = new YamlConfiguration();
-        yaml.options().setHeader(List.of("Planning des enchères du serveur pour la semaine en cours (écrit par le plugin)."));
+        yaml.options().setHeader(List.of("Planning des enchères et des ventes du serveur pour la semaine en cours (écrit par le plugin)."));
         yaml.set("semaine", week);
         yaml.set("reglages", signature);
         List<Map<String, Object>> list = new ArrayList<>();
         for (Entry entry : entries) {
             Map<String, Object> map = new LinkedHashMap<>();
+            map.put("type", entry.kind.id());
             map.put("debut", entry.start);
             map.put("duree", entry.duration);
             map.put("etat", entry.status.name());
@@ -226,7 +256,7 @@ public final class ServerAuctionSchedule {
             }
             list.add(map);
         }
-        yaml.set("encheres", list);
+        yaml.set("planning", list);
         return yaml.saveToString();
     }
 
@@ -236,14 +266,16 @@ public final class ServerAuctionSchedule {
         ServerAuctionSchedule schedule = new ServerAuctionSchedule();
         schedule.week = yaml.getString("semaine");
         schedule.signature = yaml.getString("reglages");
-        for (Map<?, ?> map : yaml.getMapList("encheres")) {
+        for (Map<?, ?> map : yaml.getMapList("planning")) {
             Status status;
+            Kind kind;
             try {
                 status = Status.valueOf(String.valueOf(map.get("etat")));
+                kind = Kind.valueOf(String.valueOf(map.get("type")).toUpperCase(Locale.ROOT));
             } catch (IllegalArgumentException e) {
                 continue;
             }
-            Entry entry = new Entry(number(map.get("debut")), number(map.get("duree")), status, Boolean.TRUE.equals(map.get("forcee")));
+            Entry entry = new Entry(kind, number(map.get("debut")), number(map.get("duree")), status, Boolean.TRUE.equals(map.get("forcee")));
             if (map.get("lot") != null) {
                 entry.lot = String.valueOf(map.get("lot"));
             }

@@ -4,6 +4,7 @@ import org.Cry_Legende.sHAuctions.SHAuctions;
 import org.Cry_Legende.sHAuctions.config.MessageManager;
 import org.Cry_Legende.sHAuctions.database.DatabaseManager;
 import org.Cry_Legende.sHAuctions.manager.PermissionManager;
+import org.Cry_Legende.sHAuctions.serverauction.ServerAuctionSchedule;
 
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
@@ -22,7 +23,7 @@ import java.util.logging.Level;
 
 /**
  * /shauctions : administration du plugin, console comprise. Chaque sous-commande a sa permission
- * {@code shauctions.admin.<nom>}. plan, launch et skip gèrent les enchères du serveur.
+ * {@code shauctions.admin.<nom>}. plan, launch et skip gèrent les enchères et ventes du serveur.
  */
 public class AdminCommand implements TabExecutor {
 
@@ -69,14 +70,8 @@ public class AdminCommand implements TabExecutor {
             case "reload" -> plugin.reloadAll(sender);
             case "info" -> info(sender, args);
             case "plan" -> plugin.getServerAuctions().sendPlan(sender);
-            case "launch" -> {
-                if (args.length < 2) {
-                    messages.sendMessage(sender, "server_launch_usage");
-                } else {
-                    plugin.getServerAuctions().launchNow(sender, args[1], args.length > 2 ? args[2] : null);
-                }
-            }
-            default -> plugin.getServerAuctions().skipNext(sender);
+            case "launch" -> plugin.getServerAuctions().launchNow(sender, java.util.Arrays.copyOfRange(args, 1, args.length));
+            default -> plugin.getServerAuctions().skipNext(sender, args.length > 1 ? args[1] : null);
         }
         return true;
     }
@@ -159,11 +154,23 @@ public class AdminCommand implements TabExecutor {
             return Bukkit.getOnlinePlayers().stream().map(Player::getName)
                 .filter(name -> name.toLowerCase(Locale.ROOT).startsWith(start)).toList();
         }
-        if (args.length == 2 && args[0].equalsIgnoreCase("launch") && can(sender, "launch")) {
-            String start = args[1].toLowerCase(Locale.ROOT);
-            List<String> ids = new ArrayList<>(plugin.getServerAuctions().lotIds());
+        if (args[0].equalsIgnoreCase("launch") && can(sender, "launch") && (args.length == 2 || args.length == 3)) {
+            boolean sale = args.length == 3 && args[1].equalsIgnoreCase("vente");
+            if (args.length == 3 && !sale && !args[1].equalsIgnoreCase("enchere")) {
+                return List.of();
+            }
+            String start = args[args.length - 1].toLowerCase(Locale.ROOT);
+            List<String> ids = new ArrayList<>(plugin.getServerAuctions().lotIds(sale ? ServerAuctionSchedule.Kind.VENTE : ServerAuctionSchedule.Kind.ENCHERE));
             ids.add("random");
+            if (args.length == 2) {
+                ids.add("vente");
+                ids.add("enchere");
+            }
             return ids.stream().filter(id -> id.toLowerCase(Locale.ROOT).startsWith(start)).toList();
+        }
+        if (args.length == 2 && args[0].equalsIgnoreCase("skip") && can(sender, "skip")) {
+            String start = args[1].toLowerCase(Locale.ROOT);
+            return List.of("enchere", "vente").stream().filter(kind -> kind.startsWith(start)).toList();
         }
         return List.of();
     }

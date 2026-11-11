@@ -5,14 +5,18 @@ import org.Cry_Legende.sHAuctions.SHAuctions;
 import org.Cry_Legende.sHAuctions.config.ConfigManager;
 import org.Cry_Legende.sHAuctions.config.MessageManager;
 import org.Cry_Legende.sHAuctions.database.dao.AuctionDAO;
+import org.Cry_Legende.sHAuctions.event.AuctionItemListedEvent;
 import org.Cry_Legende.sHAuctions.manager.AuctionManager;
 import org.Cry_Legende.sHAuctions.manager.SharedFlows;
 import org.Cry_Legende.sHAuctions.model.AuctionItem;
 import org.Cry_Legende.sHAuctions.serverauction.ServerAuctionPlanner.Settings;
 import org.Cry_Legende.sHAuctions.serverauction.ServerAuctionSchedule.Entry;
+import org.Cry_Legende.sHAuctions.serverauction.ServerAuctionSchedule.Kind;
+import org.Cry_Legende.sHAuctions.serverauction.ServerAuctionSchedule.Status;
 import org.Cry_Legende.sHAuctions.util.ItemUtil;
 import org.Cry_Legende.sHAuctions.util.TimeUtil;
 import org.bukkit.Bukkit;
+import org.bukkit.ChatColor;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.Sound;
@@ -28,6 +32,7 @@ import org.bukkit.scheduler.BukkitTask;
 import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -44,38 +49,40 @@ import java.util.Set;
 import java.util.logging.Level;
 
 /**
- * Enchères du serveur : quelques fois par semaine, le serveur met lui-même un lot aux enchères dans la page Enchères.
+ * Enchères et ventes du serveur : chaque jour, le serveur met lui-même des lots aux enchères (page Enchères) et en
+ * vente à prix fixe (page Ventes).
  *
  * <ul>
- *   <li>L'annonce est une enchère ordinaire dont le vendeur est {@link AuctionItem#SERVER_SELLER} : affichage, mises,
- *   remboursements et anti-snipe sont ceux de l'HDV.</li>
- *   <li>L'objet affiché porte son lot (identifiant, commandes, incrément) : n'importe quel serveur du réseau sait le
- *   régler, même après un reload qui a changé la liste des lots.</li>
- *   <li>Au règlement, l'offre gagnante n'est versée à personne. Le lot est remis par ses commandes si le gagnant est
+ *   <li>Ce sont des annonces ordinaires dont le vendeur est {@link AuctionItem#SERVER_SELLER} : affichage, mises,
+ *   remboursements, anti-snipe et achat sont ceux de l'HDV.</li>
+ *   <li>L'objet affiché porte son lot (identifiant, type, commandes, incrément) : n'importe quel serveur du réseau sait
+ *   le régler, même après un reload qui a changé la liste des lots.</li>
+ *   <li>L'argent de l'acheteur ou du gagnant n'est versé à personne. Le lot est remis par ses commandes si le joueur est
  *   là avec une place libre, sinon l'objet affiché part dans ses invendus et le lot est remis quand il le récupère
  *   (l'objet affiché n'est jamais donné).</li>
  * </ul>
  *
- * <p>Seul le serveur où {@code encheres-serveur.actif} vaut true tient le planning et lance les enchères.</p>
+ * <p>Seul le serveur où {@code encheres-serveur.actif} ou {@code ventes-serveur.actif} vaut true tient le planning et
+ * lance les annonces de ce type.</p>
  */
 public final class ServerAuctionManager {
 
-    private static final String S = "encheres-serveur.";
     private static final long TICK_PERIOD = 20L * 20;
     private static final DateTimeFormatter HOUR = DateTimeFormatter.ofPattern("H:mm");
     private static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("EEE dd/MM HH:mm", Locale.FRENCH);
 
-    /** Un lot de config.yml. */
-    public record Lot(String id, int weight, double startPrice, double increment, Material material, int amount, String name,
+    /** Un lot de config.yml (prix : départ d'une enchère, ou prix fixe d'une vente). */
+    public record Lot(Kind kind, String id, int weight, double price, double increment, Material material, int amount, String name,
                       List<String> lore, String texture, boolean glint, List<String> commands) {
     }
 
-    /** Lot porté par l'objet d'une enchère du serveur. */
-    public record LotData(String id, List<String> commands, double increment) {
+    /** Lot porté par l'objet d'une annonce du serveur. */
+    public record LotData(Kind kind, String id, List<String> commands, double increment) {
     }
 
     private final SHAuctions plugin;
     private final NamespacedKey lotKey;
+    private final NamespacedKey kindKey;
     private final NamespacedKey commandsKey;
     private final NamespacedKey incrementKey;
     private final File file;
@@ -87,6 +94,7 @@ public final class ServerAuctionManager {
     public ServerAuctionManager(SHAuctions plugin) {
         this.plugin = plugin;
         this.lotKey = new NamespacedKey(plugin, "lot");
+        this.kindKey = new NamespacedKey(plugin, "lot-type");
         this.commandsKey = new NamespacedKey(plugin, "lot-commandes");
         this.incrementKey = new NamespacedKey(plugin, "lot-increment");
         this.file = new File(plugin.getDataFolder(), "encheres-serveur.yml");
@@ -106,6 +114,10 @@ public final class ServerAuctionManager {
 
     private static ZoneId zone() {
         return ZoneId.systemDefault();
+    }
+
+    private static String section(Kind kind) {
+        return kind == Kind.ENCHERE ? "encheres-serveur." : "ventes-serveur.";
     }
 
     // ------------------------------------------------------------------ cycle de vie
@@ -135,28 +147,43 @@ public final class ServerAuctionManager {
         tick();
     }
 
-    /** Vrai si ce serveur tient le planning et lance les enchères du serveur. */
+    /** Vrai si ce serveur lance les annonces de ce type. */
+    public boolean isActive(Kind kind) {
+        return config().getBoolean(section(kind) + "actif", false);
+    }
+
+    /** Vrai si ce serveur tient un planning (enchères ou ventes). */
     public boolean isActive() {
-        return config().getBoolean(S + "actif", false);
+        return isActive(Kind.ENCHERE) || isActive(Kind.VENTE);
     }
 
     private void checkLots() {
-        List<Lot> lots = parseLots(true);
-        if (isActive()) {
-            long drawable = lots.stream().filter(lot -> lot.weight() > 0).count();
-            plugin.getLogger().info("Enchères du serveur actives : " + lots.size() + " lot(s), dont " + drawable + " tirable(s).");
-            if (drawable == 0) {
-                plugin.getLogger().warning("Enchères du serveur : aucun lot avec un poids positif, aucune ne sera lancée.");
+        for (Kind kind : Kind.values()) {
+            List<Lot> lots = parseLots(kind, true);
+            if (isActive(kind)) {
+                long drawable = lots.stream().filter(lot -> lot.weight() > 0).count();
+                plugin.getLogger().info((kind == Kind.ENCHERE ? "Enchères" : "Ventes") + " du serveur actives : " + lots.size()
+                    + " lot(s), dont " + drawable + " tirable(s).");
+                if (drawable == 0) {
+                    plugin.getLogger().warning(section(kind) + "lots : aucun lot avec un poids positif, rien ne sera lancé.");
+                }
             }
         }
     }
 
     // ------------------------------------------------------------------ réglages
 
-    Settings settings() {
-        return new Settings(config().getInt(S + "par-semaine", 7), time(S + "plage-horaire.debut", "12:00"),
-            time(S + "plage-horaire.fin", "23:30"), config().getInt(S + "ecart-minimal-minutes", 240),
-            config().getInt(S + "duree-minutes.min", 180), config().getInt(S + "duree-minutes.max", 360));
+    /** Réglages du planning d'un type, ou null s'il est désactivé sur ce serveur. */
+    Settings settings(Kind kind) {
+        if (!isActive(kind)) {
+            return null;
+        }
+        String s = section(kind);
+        boolean auction = kind == Kind.ENCHERE;
+        return new Settings(config().getInt(s + "par-jour.min", 1), config().getInt(s + "par-jour.max", 3),
+            time(s + "plage-horaire.debut", "12:00"), time(s + "plage-horaire.fin", "23:30"),
+            config().getInt(s + "ecart-minimal-minutes", auction ? 180 : 60),
+            config().getInt(s + "duree-minutes.min", auction ? 120 : 360), config().getInt(s + "duree-minutes.max", auction ? 240 : 720));
     }
 
     private LocalTime time(String path, String def) {
@@ -171,60 +198,58 @@ public final class ServerAuctionManager {
         }
     }
 
-    private String sellerName() {
-        return config().getString(S + "vendeur", "SkyHand");
+    private String sellerName(Kind kind) {
+        return config().getString(section(kind) + "vendeur", "SkyHand");
     }
 
-    private int cap() {
-        return config().getInt(S + "max-gagnees-par-joueur", 2);
-    }
-
-    /** Lots de config.yml ; un lot incomplet est ignoré (signalé dans la console si {@code warn}). */
-    public List<Lot> parseLots(boolean warn) {
+    /** Lots de config.yml d'un type ; un lot incomplet est ignoré (signalé dans la console si {@code warn}). */
+    public List<Lot> parseLots(Kind kind, boolean warn) {
+        String s = section(kind);
+        String priceKey = kind == Kind.ENCHERE ? "prix-depart" : "prix";
         List<Lot> lots = new ArrayList<>();
         Set<String> ids = new HashSet<>();
         double globalIncrement = config().getDouble("bids.min_bid_increment", 1.0);
         int index = 0;
-        for (Map<?, ?> raw : config().getRawConfig().getMapList(S + "lots")) {
+        for (Map<?, ?> raw : config().getRawConfig().getMapList(s + "lots")) {
             index++;
             String id = text(raw.get("id"));
             if (id == null || id.isBlank()) {
-                lotWarning(warn, "lot n°" + index + " sans id, ignoré.");
+                lotWarning(warn, s, "lot n°" + index + " sans id, ignoré.");
                 continue;
             }
             if (!ids.add(id.toLowerCase(Locale.ROOT))) {
-                lotWarning(warn, "lot " + id + " en double, seul le premier est gardé.");
+                lotWarning(warn, s, "lot " + id + " en double, seul le premier est gardé.");
                 continue;
             }
             Map<?, ?> item = raw.get("objet") instanceof Map<?, ?> map ? map : Map.of();
             String materialName = text(item.get("materiau"));
             Material material = materialName == null ? null : Material.matchMaterial(materialName);
             if (material == null || !material.isItem() || material.isAir()) {
-                lotWarning(warn, "lot " + id + " : objet.materiau « " + materialName + " » inconnu, lot ignoré.");
+                lotWarning(warn, s, "lot " + id + " : objet.materiau « " + materialName + " » inconnu, lot ignoré.");
                 continue;
             }
             List<String> commands = texts(raw.get("commandes"));
             if (commands.isEmpty()) {
-                lotWarning(warn, "lot " + id + " sans commandes, ignoré.");
+                lotWarning(warn, s, "lot " + id + " sans commandes, ignoré.");
                 continue;
             }
-            double price = number(raw.get("prix-depart"), 0);
+            double price = number(raw.get(priceKey), 0);
             if (price <= 0) {
-                lotWarning(warn, "lot " + id + " : prix-depart manquant ou nul, lot ignoré.");
+                lotWarning(warn, s, "lot " + id + " : " + priceKey + " manquant ou nul, lot ignoré.");
                 continue;
             }
             double increment = number(raw.get("increment-min"), 0);
             int amount = (int) Math.max(1, Math.min(material.getMaxStackSize(), number(item.get("quantite"), 1)));
-            lots.add(new Lot(id, (int) Math.max(0, number(raw.get("poids"), 0)), price, increment > 0 ? increment : globalIncrement, material,
-                amount, text(item.get("nom")), texts(item.get("description")), text(item.get("texture")), Boolean.TRUE.equals(item.get("brillant")),
-                commands));
+            lots.add(new Lot(kind, id, (int) Math.max(0, number(raw.get("poids"), 0)), price, increment > 0 ? increment : globalIncrement,
+                material, amount, text(item.get("nom")), texts(item.get("description")), text(item.get("texture")),
+                Boolean.TRUE.equals(item.get("brillant")), commands));
         }
         return lots;
     }
 
-    private void lotWarning(boolean warn, String message) {
+    private void lotWarning(boolean warn, String section, String message) {
         if (warn) {
-            plugin.getLogger().warning("config.yml encheres-serveur.lots : " + message);
+            plugin.getLogger().warning("config.yml " + section + "lots : " + message);
         }
     }
 
@@ -275,24 +300,25 @@ public final class ServerAuctionManager {
 
     // ------------------------------------------------------------------ planning
 
-    /** Passage périodique (thread principal) : planning de la semaine, puis lancement des enchères arrivées à l'heure. */
+    /** Passage périodique (thread principal) : planning de la semaine, puis lancement de ce qui est arrivé à l'heure. */
     void tick() {
         if (!isActive()) {
             return;
         }
-        Settings settings = settings();
+        Settings auctions = settings(Kind.ENCHERE);
+        Settings sales = settings(Kind.VENTE);
         ZonedDateTime now = ZonedDateTime.now(zone());
-        boolean changed = refresh(settings, now);
-        ServerAuctionSchedule.Due due = schedule.due(settings, now);
+        boolean changed = refresh(auctions, sales, now);
+        ServerAuctionSchedule.Due due = schedule.due(auctions, sales, now);
         for (Entry entry : due.missed()) {
-            plugin.getLogger().warning("Enchère du serveur de " + format(entry.start()) + " manquée : serveur éteint pendant sa plage horaire.");
+            plugin.getLogger().warning(label(entry.kind()) + " du serveur de " + format(entry.start()) + " manquée : serveur éteint pendant sa plage horaire.");
             changed = true;
         }
         for (Entry entry : due.toLaunch()) {
-            Lot lot = drawLot(parseLots(false));
+            Lot lot = drawLot(parseLots(entry.kind(), false));
             long id = lot == null ? -1 : create(lot, entry.duration());
             if (id < 0) {
-                plugin.getLogger().warning("Enchère du serveur de " + format(entry.start()) + " non lancée (aucun lot valide ou erreur base).");
+                plugin.getLogger().warning(label(entry.kind()) + " du serveur de " + format(entry.start()) + " non lancée (aucun lot valide ou erreur base).");
                 entry.missed();
             } else {
                 entry.launched(lot.id(), id);
@@ -304,14 +330,19 @@ public final class ServerAuctionManager {
         }
     }
 
-    private boolean refresh(Settings settings, ZonedDateTime now) {
+    private static String label(Kind kind) {
+        return kind == Kind.ENCHERE ? "Enchère" : "Vente";
+    }
+
+    private boolean refresh(Settings auctions, Settings sales, ZonedDateTime now) {
         String before = schedule.week();
-        if (!schedule.refresh(settings, now, random)) {
+        if (!schedule.refresh(auctions, sales, now, random)) {
             return false;
         }
-        long planned = schedule.entries().stream().filter(e -> !e.forced() && e.status() == ServerAuctionSchedule.Status.PREVUE).count();
-        plugin.getLogger().info((schedule.week().equals(before) ? "Planning des enchères du serveur refait (réglages changés) : "
-            : "Planning des enchères du serveur, semaine du " + schedule.week() + " : ") + planned + " à venir.");
+        long planned = schedule.entries().stream().filter(e -> e.kind() == Kind.ENCHERE && e.status() == Status.PREVUE).count();
+        long plannedSales = schedule.entries().stream().filter(e -> e.kind() == Kind.VENTE && e.status() == Status.PREVUE).count();
+        plugin.getLogger().info((schedule.week().equals(before) ? "Planning du serveur refait (réglages changés) : "
+            : "Planning du serveur, semaine du " + schedule.week() + " : ") + planned + " enchère(s) et " + plannedSales + " vente(s) à venir.");
         return true;
     }
 
@@ -329,7 +360,7 @@ public final class ServerAuctionManager {
 
     // ------------------------------------------------------------------ lancement
 
-    /** Objet affiché dans l'HDV : apparence du lot, plus le lot lui-même (identifiant, commandes, incrément). */
+    /** Objet affiché dans l'HDV : apparence du lot, plus le lot lui-même (identifiant, type, commandes, incrément). */
     ItemStack buildItem(Lot lot) {
         ItemStack item = ItemUtil.createItemStack(lot.material(), lot.amount(), lot.name(), lot.lore());
         if (lot.texture() != null && !lot.texture().isBlank()) {
@@ -342,39 +373,51 @@ public final class ServerAuctionManager {
             }
             PersistentDataContainer pdc = meta.getPersistentDataContainer();
             pdc.set(lotKey, PersistentDataType.STRING, lot.id());
+            pdc.set(kindKey, PersistentDataType.STRING, lot.kind().id());
             pdc.set(commandsKey, PersistentDataType.STRING, String.join("\n", lot.commands()));
-            pdc.set(incrementKey, PersistentDataType.DOUBLE, lot.increment());
+            if (lot.kind() == Kind.ENCHERE) {
+                pdc.set(incrementKey, PersistentDataType.DOUBLE, lot.increment());
+            }
             item.setItemMeta(meta);
         }
         return item;
     }
 
-    /** Met le lot aux enchères, l'annonce et prévient les autres serveurs. @return l'id de l'annonce, ou -1 */
+    /** Met le lot aux enchères ou en vente, l'annonce et prévient les autres serveurs. @return l'id de l'annonce, ou -1 */
     private long create(Lot lot, long durationSeconds) {
         ItemStack item = buildItem(lot);
-        long id = auctions().addBidAuction(AuctionItem.SERVER_SELLER, sellerName(), item, lot.startPrice(), durationSeconds);
+        boolean auction = lot.kind() == Kind.ENCHERE;
+        String seller = sellerName(lot.kind());
+        long id = auction
+            ? auctions().addBidAuction(AuctionItem.SERVER_SELLER, seller, item, lot.price(), durationSeconds)
+            : auctions().addAuction(AuctionItem.SERVER_SELLER, seller, item, lot.price(), durationSeconds);
         if (id == -1) {
-            plugin.getLogger().severe("Enchère du serveur (lot " + lot.id() + ") non enregistrée en base.");
+            plugin.getLogger().severe(label(lot.kind()) + " du serveur (lot " + lot.id() + ") non enregistrée en base.");
             return -1;
         }
         AuctionManager am = plugin.getAuctionManager();
-        String label = plain(label(item));
-        am.writeLog("encheres-serveur-lancement", "encheres-serveur", "%lot% -> mis aux enchères par le serveur : %item% (départ %price% SHCoins, durée %duration%)",
-            "%lot%", lot.id(),
-            "%item%", label,
-            "%price%", AuctionManager.logPrice(lot.startPrice()),
-            "%duration%", TimeUtil.formatDuration(durationSeconds));
-        plugin.getLogger().info("ENCHÈRE DU SERVEUR: lot " + lot.id() + " (" + label + ") mis aux enchères, départ "
-            + AuctionManager.logPrice(lot.startPrice()) + ", durée " + TimeUtil.formatDuration(durationSeconds) + " (ID: " + id + ").");
-        AuctionItem auction = auctions().getAuctionById(id);
-        if (auction != null) {
-            sendStartAnnouncement(auction);
+        String name = plain(label(item));
+        if (auction) {
+            am.writeLog("encheres-serveur-lancement", "encheres-serveur", "%lot% -> mis aux enchères par le serveur : %item% (départ %price% SHCoins, durée %duration%)",
+                "%lot%", lot.id(), "%item%", name, "%price%", AuctionManager.logPrice(lot.price()), "%duration%", TimeUtil.formatDuration(durationSeconds));
+        } else {
+            am.writeLog("ventes-serveur-mise-en-vente", "ventes-serveur", "%lot% -> mis en vente par le serveur : %item% (%price% SHCoins, durée %duration%)",
+                "%lot%", lot.id(), "%item%", name, "%price%", AuctionManager.logPrice(lot.price()), "%duration%", TimeUtil.formatDuration(durationSeconds));
+        }
+        plugin.getLogger().info((auction ? "ENCHÈRE" : "VENTE") + " DU SERVEUR: lot " + lot.id() + " (" + name + ") à "
+            + AuctionManager.logPrice(lot.price()) + ", durée " + TimeUtil.formatDuration(durationSeconds) + " (ID: " + id + ").");
+        AuctionItem listed = auctions().getAuctionById(id);
+        if (listed != null) {
+            sendAnnouncement(listed);
             SharedFlows shared = plugin.getSharedFlows();
             if (shared != null) {
-                shared.serverListed(auction);
+                shared.serverListed(listed);
             }
+            Bukkit.getPluginManager().callEvent(new AuctionItemListedEvent(listed));
         }
-        plugin.getGuiManager().refreshOpenBidMenus();
+        if (auction) {
+            plugin.getGuiManager().refreshOpenBidMenus();
+        }
         return id;
     }
 
@@ -386,26 +429,31 @@ public final class ServerAuctionManager {
 
     /** Texte sans codes couleur, pour les logs. */
     private static String plain(String text) {
-        return org.bukkit.ChatColor.stripColor(text);
+        return ChatColor.stripColor(text);
     }
 
     // ------------------------------------------------------------------ annonces
 
-    /** Annonce d'une nouvelle enchère du serveur aux joueurs de ce serveur : cliquable, objet survolable. */
-    public void sendStartAnnouncement(AuctionItem auction) {
-        if (messages().getRaw("server_auction_start", "").isBlank()) {
+    /**
+     * Annonce d'une nouvelle enchère ou vente du serveur aux joueurs de ce serveur : cliquable (page Enchères ou
+     * Ventes), objet survolable.
+     */
+    public void sendAnnouncement(AuctionItem listed) {
+        boolean auction = listed.isBid();
+        String key = auction ? "server_auction_start" : "server_sale_start";
+        if (messages().getRaw(key, "").isBlank()) {
             return;
         }
-        ItemStack item = auction.getItemStack();
+        ItemStack item = listed.getItemStack();
         Map<String, String> ph = new HashMap<>();
-        ph.put("seller", auction.getSellerName());
-        ph.put("price", plugin.getEconomyProvider().formatCurrencyDetailed(auction.getStartingPrice()));
-        long remaining = auction.getExpireTimestamp() - System.currentTimeMillis() / 1000L;
+        ph.put("seller", listed.getSellerName());
+        ph.put("price", plugin.getEconomyProvider().formatCurrencyDetailed(listed.getPrice()));
+        long remaining = listed.getExpireTimestamp() - System.currentTimeMillis() / 1000L;
         ph.put("duration", TimeUtil.formatDuration(Math.max(0, remaining)));
-        String template = messages().getMessage("server_auction_start", false, ph);
-        TextComponent line = plugin.getAuctionManager().itemAnnouncement(template, item, label(item), "/hdv encheres",
-            messages().getMessage("server_auction_start_hover", false));
-        Sound sound = ConfigManager.sound(config().getString(S + "son-annonce", ""));
+        String template = messages().getMessage(key, false, ph);
+        TextComponent line = plugin.getAuctionManager().itemAnnouncement(template, item, label(item), auction ? "/hdv encheres" : "/hdv",
+            messages().getMessage(key + "_hover", false));
+        Sound sound = ConfigManager.sound(config().getString(section(auction ? Kind.ENCHERE : Kind.VENTE) + "son-annonce", ""));
         for (Player online : Bukkit.getOnlinePlayers()) {
             online.spigot().sendMessage(line);
             if (sound != null) {
@@ -414,7 +462,7 @@ public final class ServerAuctionManager {
         }
     }
 
-    /** Annonce le gagnant à ce serveur et, en mode réseau, aux autres. */
+    /** Annonce le gagnant d'une enchère du serveur à ce serveur et, en mode réseau, aux autres. */
     public void announceResult(String winner, ItemStack item, double price) {
         Map<String, String> ph = new HashMap<>();
         ph.put("player", winner);
@@ -438,9 +486,9 @@ public final class ServerAuctionManager {
         }
     }
 
-    // ------------------------------------------------------------------ mises et règlement
+    // ------------------------------------------------------------------ règlement
 
-    /** Lot porté par l'objet d'une enchère du serveur, ou null pour un objet ordinaire. */
+    /** Lot porté par l'objet d'une annonce du serveur, ou null pour un objet ordinaire. */
     public LotData lotOf(ItemStack item) {
         if (item == null || !item.hasItemMeta()) {
             return null;
@@ -450,41 +498,9 @@ public final class ServerAuctionManager {
         if (commands == null) {
             return null;
         }
-        return new LotData(pdc.getOrDefault(lotKey, PersistentDataType.STRING, "?"), List.of(commands.split("\n")),
+        Kind kind = "vente".equals(pdc.get(kindKey, PersistentDataType.STRING)) ? Kind.VENTE : Kind.ENCHERE;
+        return new LotData(kind, pdc.getOrDefault(lotKey, PersistentDataType.STRING, "?"), List.of(commands.split("\n")),
             pdc.getOrDefault(incrementKey, PersistentDataType.DOUBLE, -1.0));
-    }
-
-    /**
-     * Plafond hebdomadaire : enchères du serveur remportées cette semaine plus celles où le joueur est déjà en tête.
-     *
-     * @return vrai si la mise peut continuer ; sinon le joueur est prévenu
-     */
-    public boolean mayBid(Player bidder, AuctionItem auction) {
-        if (!capReached(bidder, auction)) {
-            return true;
-        }
-        messages().sendMessage(bidder, "server_auction_cap_reached", Map.of("cap", String.valueOf(cap())));
-        return false;
-    }
-
-    /** Vrai si ce joueur a atteint le plafond hebdomadaire (toujours faux pour une enchère de joueur). */
-    public boolean capReached(Player bidder, AuctionItem auction) {
-        if (auction == null || !auction.isServerAuction()) {
-            return false;
-        }
-        int cap = cap();
-        if (cap <= 0) {
-            return false;
-        }
-        long since = ServerAuctionPlanner.weekStart(ZonedDateTime.now(zone())).toEpochSecond();
-        int won = plugin.getDatabaseManager().getSoldItemDAO().countPurchasesFrom(AuctionItem.SERVER_SELLER, bidder.getUniqueId(), since);
-        int leading = 0;
-        for (AuctionItem other : auctions().getAuctionsBySeller(AuctionItem.SERVER_SELLER)) {
-            if (other.getId() != auction.getId() && other.hasBid() && bidder.getUniqueId().equals(other.getHighestBidderUuid())) {
-                leading++;
-            }
-        }
-        return !ServerAuctionPlanner.mayBid(won, leading, cap);
     }
 
     /**
@@ -504,17 +520,18 @@ public final class ServerAuctionManager {
             }
             try {
                 if (!Bukkit.dispatchCommand(Bukkit.getConsoleSender(), line)) {
-                    plugin.getLogger().severe("Lot " + lot.id() + " (enchère " + auctionId + ") : commande inconnue « " + line + " ». À lancer à la main pour " + player.getName() + ".");
+                    plugin.getLogger().severe("Lot " + lot.id() + " (annonce " + auctionId + ") : commande inconnue « " + line + " ». À lancer à la main pour " + player.getName() + ".");
                 }
             } catch (RuntimeException e) {
-                plugin.getLogger().log(Level.SEVERE, "Lot " + lot.id() + " (enchère " + auctionId + ") : la commande « " + line + " » a échoué pour " + player.getName() + ".", e);
+                plugin.getLogger().log(Level.SEVERE, "Lot " + lot.id() + " (annonce " + auctionId + ") : la commande « " + line + " » a échoué pour " + player.getName() + ".", e);
             }
         }
-        plugin.getAuctionManager().writeLog("encheres-serveur-livraison", "encheres-serveur", "%player% -> reçoit le lot %lot% (%item%)",
+        String prefix = lot.kind() == Kind.ENCHERE ? "encheres-serveur" : "ventes-serveur";
+        plugin.getAuctionManager().writeLog(prefix + "-livraison", prefix, "%player% -> reçoit le lot %lot% (%item%)",
             "%player%", player.getName(),
             "%lot%", lot.id(),
             "%item%", plain(label(item)));
-        plugin.getLogger().info("ENCHÈRE DU SERVEUR: lot " + lot.id() + " remis à " + player.getName() + " (ID: " + auctionId + ").");
+        plugin.getLogger().info(label(lot.kind()).toUpperCase(Locale.ROOT) + " DU SERVEUR: lot " + lot.id() + " remis à " + player.getName() + " (ID: " + auctionId + ").");
         return true;
     }
 
@@ -524,15 +541,33 @@ public final class ServerAuctionManager {
         return lot == null ? null : String.join(" ; ", lot.commands()).replace("%player%", player);
     }
 
-    /** Enchère du serveur terminée sans offre : rien ne bouge, une ligne dans les logs. */
-    public void endedWithoutBid(AuctionItem auction, ItemStack item) {
-        plugin.getAuctionManager().writeLog("encheres-serveur-sans-offre", "encheres-serveur", "%item% -> enchère du serveur terminée sans offre (départ %price% SHCoins)",
-            "%item%", plain(label(item)),
-            "%price%", AuctionManager.logPrice(auction.getStartingPrice()));
-        plugin.getLogger().info("ENCHÈRE DU SERVEUR: " + plain(label(item)) + " terminée sans offre (ID: " + auction.getId() + ").");
+    /** Enchère du serveur terminée sans offre, ou vente du serveur jamais achetée : rien ne bouge, une ligne de log. */
+    public void endedWithoutBid(AuctionItem listed, ItemStack item) {
+        String name = plain(label(item));
+        String price = AuctionManager.logPrice(listed.getPrice());
+        if (listed.isBid()) {
+            plugin.getAuctionManager().writeLog("encheres-serveur-sans-offre", "encheres-serveur", "%item% -> enchère du serveur terminée sans offre (départ %price% SHCoins)",
+                "%item%", name, "%price%", price);
+            plugin.getLogger().info("ENCHÈRE DU SERVEUR: " + name + " terminée sans offre (ID: " + listed.getId() + ").");
+        } else {
+            plugin.getAuctionManager().writeLog("ventes-serveur-invendue", "ventes-serveur", "%item% -> vente du serveur terminée sans acheteur (%price% SHCoins)",
+                "%item%", name, "%price%", price);
+            plugin.getLogger().info("VENTE DU SERVEUR: " + name + " terminée sans acheteur (ID: " + listed.getId() + ").");
+        }
     }
 
     // ------------------------------------------------------------------ administration
+
+    private static Kind kindArg(String raw) {
+        if (raw == null) {
+            return null;
+        }
+        return switch (raw.toLowerCase(Locale.ROOT)) {
+            case "vente", "ventes" -> Kind.VENTE;
+            case "enchere", "enchère", "encheres", "enchères" -> Kind.ENCHERE;
+            default -> null;
+        };
+    }
 
     /** /shauctions plan */
     public void sendPlan(CommandSender sender) {
@@ -540,15 +575,14 @@ public final class ServerAuctionManager {
             messages().sendMessage(sender, "server_auctions_inactive");
             return;
         }
-        if (refresh(settings(), ZonedDateTime.now(zone()))) {
+        if (refresh(settings(Kind.ENCHERE), settings(Kind.VENTE), ZonedDateTime.now(zone()))) {
             save();
         }
         List<Entry> entries = schedule.entries();
-        long count = entries.stream().filter(e -> !e.forced()).count();
         messages().sendMessage(sender, "server_plan_header", Map.of(
-            "week", schedule.week() == null ? "?" : java.time.LocalDate.parse(schedule.week()).format(DateTimeFormatter.ofPattern("dd/MM")),
-            "count", String.valueOf(count),
-            "cap", cap() <= 0 ? "∞" : String.valueOf(cap())));
+            "week", schedule.week() == null ? "?" : LocalDate.parse(schedule.week()).format(DateTimeFormatter.ofPattern("dd/MM")),
+            "auctions", String.valueOf(entries.stream().filter(e -> e.kind() == Kind.ENCHERE && !e.forced()).count()),
+            "sales", String.valueOf(entries.stream().filter(e -> e.kind() == Kind.VENTE && !e.forced()).count())));
         if (entries.isEmpty()) {
             messages().sendMessage(sender, "server_plan_empty");
             return;
@@ -558,14 +592,28 @@ public final class ServerAuctionManager {
             String status = messages().getMessage("server_plan_status." + statusKey, false, Map.of("lot", entry.lot() == null ? "?" : entry.lot()));
             sender.sendMessage(messages().getMessage("server_plan_line", false, Map.of(
                 "date", format(entry.start()),
+                "kind", messages().getMessage("server_plan_kind." + entry.kind().id(), false),
                 "duration", TimeUtil.formatDuration(entry.duration()),
                 "status", status)));
         }
     }
 
-    /** /shauctions launch <lot|random> [durée] */
-    public void launchNow(CommandSender sender, String lotArg, String durationArg) {
-        List<Lot> lots = parseLots(false);
+    /** /shauctions launch [vente|enchere] <lot|random> [durée] (enchère si le type est omis) */
+    public void launchNow(CommandSender sender, String[] args) {
+        int first = 0;
+        Kind kind = kindArg(args.length > 0 ? args[0] : null);
+        if (kind != null) {
+            first = 1;
+        } else {
+            kind = Kind.ENCHERE;
+        }
+        if (args.length <= first) {
+            messages().sendMessage(sender, "server_launch_usage");
+            return;
+        }
+        String lotArg = args[first];
+        String durationArg = args.length > first + 1 ? args[first + 1] : null;
+        List<Lot> lots = parseLots(kind, false);
         Lot lot = null;
         if ("random".equalsIgnoreCase(lotArg)) {
             lot = drawLot(lots);
@@ -578,15 +626,17 @@ public final class ServerAuctionManager {
             }
         }
         if (lot == null) {
-            messages().sendMessage(sender, "server_launch_unknown_lot", Map.of("lot", lotArg, "lots", String.join(", ", lotIds())));
+            messages().sendMessage(sender, "server_launch_unknown_lot", Map.of("lot", lotArg, "lots", String.join(", ", lotIds(kind))));
             return;
         }
         long duration;
         if (durationArg != null) {
             duration = TimeUtil.parseDurationFlexible(durationArg);
         } else {
-            Settings settings = settings();
-            duration = 60L * (settings.minDurationMinutes() + random.nextInt(settings.maxDurationMinutes() - settings.minDurationMinutes() + 1));
+            boolean auction = kind == Kind.ENCHERE;
+            int min = config().getInt(section(kind) + "duree-minutes.min", auction ? 120 : 360);
+            int max = Math.max(min, config().getInt(section(kind) + "duree-minutes.max", auction ? 240 : 720));
+            duration = 60L * (min + random.nextInt(max - min + 1));
         }
         if (duration <= 0) {
             messages().sendMessage(sender, "invalid_duration_format");
@@ -598,31 +648,36 @@ public final class ServerAuctionManager {
             return;
         }
         if (isActive()) {
-            schedule.addForced(System.currentTimeMillis() / 1000L, duration, lot.id(), id);
+            schedule.addForced(kind, System.currentTimeMillis() / 1000L, duration, lot.id(), id);
             save();
         }
-        messages().sendMessage(sender, "server_launch_done", Map.of("lot", lot.id(), "duration", TimeUtil.formatDuration(duration)));
+        messages().sendMessage(sender, "server_launch_done", Map.of(
+            "kind", messages().getMessage("server_plan_kind." + kind.id(), false),
+            "lot", lot.id(),
+            "duration", TimeUtil.formatDuration(duration)));
     }
 
-    /** /shauctions skip */
-    public void skipNext(CommandSender sender) {
+    /** /shauctions skip [vente|enchere] */
+    public void skipNext(CommandSender sender, String kindRaw) {
         if (!isActive()) {
             messages().sendMessage(sender, "server_auctions_inactive");
             return;
         }
-        refresh(settings(), ZonedDateTime.now(zone()));
-        Entry skipped = schedule.skipNext();
+        refresh(settings(Kind.ENCHERE), settings(Kind.VENTE), ZonedDateTime.now(zone()));
+        Entry skipped = schedule.skipNext(kindArg(kindRaw));
         save();
         if (skipped == null) {
             messages().sendMessage(sender, "server_skip_none");
         } else {
-            messages().sendMessage(sender, "server_skip_done", Map.of("date", format(skipped.start())));
-            plugin.getLogger().info("Enchère du serveur de " + format(skipped.start()) + " retirée du planning par " + sender.getName() + ".");
+            messages().sendMessage(sender, "server_skip_done", Map.of(
+                "kind", messages().getMessage("server_plan_kind." + skipped.kind().id(), false),
+                "date", format(skipped.start())));
+            plugin.getLogger().info(label(skipped.kind()) + " du serveur de " + format(skipped.start()) + " retirée du planning par " + sender.getName() + ".");
         }
     }
 
-    /** Identifiants des lots, pour la complétion. */
-    public List<String> lotIds() {
-        return parseLots(false).stream().map(Lot::id).toList();
+    /** Identifiants des lots d'un type, pour la complétion. */
+    public List<String> lotIds(Kind kind) {
+        return parseLots(kind, false).stream().map(Lot::id).toList();
     }
 }

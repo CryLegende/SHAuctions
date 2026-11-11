@@ -31,12 +31,15 @@
 #                                jamais touchées. (/hdv reload reste accepté.)
 #   /shauctions info <joueur>    Ventes, enchères, invendus et ventes terminées d'un joueur, avec ses limites
 #                                s'il est connecté.
-#   /shauctions plan             Planning de la semaine des enchères du serveur (voir encheres-serveur).
-#   /shauctions launch <lot|random> [durée]
-#                                Lance tout de suite une enchère du serveur sur ce lot (random = tirage au sort),
-#                                hors planning. Durée au format de /hdv bid (2m, 1h30m, 3 = 3 h) ; sans durée,
-#                                tirée dans encheres-serveur.duree-minutes.
-#   /shauctions skip             Retire du planning la prochaine enchère du serveur prévue.
+#   /shauctions plan             Planning de la semaine des enchères et ventes du serveur (encheres-serveur,
+#                                ventes-serveur).
+#   /shauctions launch [vente] <lot|random> [durée]
+#                                Lance tout de suite une enchère du serveur (une vente avec « vente ») sur ce lot,
+#                                random = tirage au sort, hors planning. Durée au format de /hdv bid (2m, 1h30m,
+#                                3 = 3 h) ; sans durée, tirée dans duree-minutes de la section.
+#   /shauctions skip [enchere|vente]
+#                                Retire du planning la prochaine enchère ou vente du serveur prévue (la prochaine
+#                                des deux sans précision).
 #
 #  PERMISSIONS
 #  ----------------------------------------------------------------------------
@@ -167,37 +170,36 @@ bids:
   # Texte affiché quand il n'y a pas encore de meilleur enchérisseur
   no_bidder_placeholder: —
 
-# Enchères du serveur : quelques fois par semaine, le serveur met lui-même un lot aux enchères dans la page Enchères,
-# vendeur affiché « vendeur ». Les joueurs misent comme sur une enchère de joueur (remboursement en cas de surenchère,
+# Enchères du serveur : chaque jour, le serveur met lui-même quelques lots aux enchères dans la page Enchères, vendeur
+# affiché « vendeur ». Les joueurs misent comme sur une enchère de joueur (remboursement en cas de surenchère,
 # anti-snipe). L'offre gagnante n'est versée à personne : elle sort de l'économie. Le gagnant reçoit le lot par les
 # commandes du lot ; s'il est hors ligne ou sans place libre, le lot part dans ses invendus (/hdv expired) et les
 # commandes sont lancées quand il le récupère. Sans offre, l'enchère disparaît sans rien faire.
-# Planning : chaque lundi 00:00 (heure du serveur), « par-semaine » débuts tirés au hasard dans la plage horaire,
-# répartis sur les jours de la semaine et chacun dans une tranche différente de la plage (jamais au même moment
-# de la journée). Il est gardé dans encheres-serveur.yml : les redémarrages ne le changent pas. Une enchère dont
-# l'heure passe pendant que le serveur est éteint est lancée au démarrage si sa plage horaire n'est pas finie.
-# Changer les réglages du planning (par-semaine, plage-horaire, écart, durée) refait la suite de la semaine.
+# Planning : chaque lundi 00:00 (heure du serveur), chaque jour de la semaine reçoit entre par-jour.min et par-jour.max
+# enchères, à des heures tirées au hasard dans la plage horaire (une par tranche égale de la plage), donc jamais à la
+# même heure d'un jour à l'autre. Il est gardé dans encheres-serveur.yml avec celui des ventes : les redémarrages ne
+# le changent pas. Une enchère dont l'heure passe serveur éteint est lancée au démarrage si sa plage n'est pas finie.
+# Changer ces réglages refait la suite de la semaine (ce qui a déjà été lancé aujourd'hui compte dans le jour).
 # Mode réseau : seul le serveur où actif vaut true tient le planning et lance les enchères ; tous les serveurs les
 # affichent, prennent les mises et peuvent les régler.
 encheres-serveur:
   actif: false
   # Nom du vendeur affiché dans l'HDV et dans les annonces
   vendeur: SkyHand
-  # Nombre d'enchères du serveur par semaine (la première semaine, au prorata des jours restants)
-  par-semaine: 7
+  # Nombre d'enchères par jour, tiré entre min et max chaque jour (le jour de la mise en route, au prorata de la plage restante)
+  par-jour:
+    min: 1
+    max: 3
   # Plage horaire des débuts, HH:mm. Une fin plus tôt que le début fait passer la plage après minuit.
   plage-horaire:
     debut: "12:00"
     fin: "23:30"
   # Écart minimal entre les débuts de deux enchères du serveur, en minutes
-  ecart-minimal-minutes: 240
+  ecart-minimal-minutes: 180
   # Durée de chaque enchère, tirée entre min et max, en minutes
   duree-minutes:
-    min: 180
-    max: 360
-  # Enchères du serveur qu'un même joueur peut remporter par semaine. Une enchère où il est déjà en tête compte :
-  # au plafond, il ne peut plus miser sur une autre. 0 = sans limite.
-  max-gagnees-par-joueur: 2
+    min: 120
+    max: 240
   # Son joué à chaque joueur avec l'annonce d'une nouvelle enchère du serveur (vide = aucun son)
   son-annonce: ""
   # Lots, tirés au sort à chaque enchère au prorata de leur poids :
@@ -325,6 +327,152 @@ encheres-serveur:
       poids: 2
       prix-depart: 1500000
       increment-min: 50000
+      objet:
+        materiau: TRIPWIRE_HOOK
+        quantite: 1
+        nom: "&bClé rare"
+        brillant: true
+      commandes:
+        - shcrates givekey %player% rare 1 physical
+
+# Ventes du serveur : chaque jour, le serveur met aussi quelques lots en vente à prix fixe dans la page Ventes, vendeur
+# affiché « vendeur ». Un seul exemplaire par vente : il disparaît une fois acheté ou à la fin de sa durée. Le prix
+# payé n'est versé à personne. L'acheteur reçoit le lot par les commandes du lot ; inventaire plein : le lot part dans
+# ses invendus (/hdv expired) et les commandes sont lancées quand il le récupère.
+# Planning : comme les enchères (nombre par jour, plage horaire, gardé dans encheres-serveur.yml), avec l'écart minimal
+# gardé aussi avec les débuts des enchères : une vente et une enchère ne tombent pas en même temps.
+ventes-serveur:
+  actif: false
+  # Nom du vendeur affiché dans l'HDV et dans les annonces
+  vendeur: SkyHand
+  # Nombre de ventes par jour, tiré entre min et max chaque jour (le jour de la mise en route, au prorata de la plage restante)
+  par-jour:
+    min: 1
+    max: 3
+  # Plage horaire des mises en vente, HH:mm. Une fin plus tôt que le début fait passer la plage après minuit.
+  plage-horaire:
+    debut: "12:00"
+    fin: "23:30"
+  # Écart minimal entre deux mises en vente, et entre une mise en vente et le début d'une enchère, en minutes
+  ecart-minimal-minutes: 60
+  # Durée de mise en vente, tirée entre min et max, en minutes
+  duree-minutes:
+    min: 360
+    max: 720
+  # Son joué à chaque joueur avec l'annonce d'une nouvelle vente du serveur (vide = aucun son)
+  son-annonce: ""
+  # Lots, tirés au sort à chaque vente au prorata de leur poids :
+  #   id              nom court (/shauctions launch vente, logs, planning)
+  #   poids           chance relative d'être tiré (0 = jamais tiré, lançable à la main)
+  #   prix            prix fixe
+  #   objet           ce qui est affiché dans l'HDV : materiau, quantite, nom, description (lignes),
+  #                   brillant (reflet d'enchantement), texture (base64, pour une PLAYER_HEAD)
+  #   commandes       lancées par la console pour l'acheteur, %player% = son pseudo
+  lots:
+    - id: cle-ordinaire
+      poids: 40
+      prix: 150000
+      objet:
+        materiau: TRIPWIRE_HOOK
+        quantite: 1
+        nom: "&eClé Ordinaire"
+        brillant: true
+      commandes:
+        - shcrates givekey %player% ordinaire 1 physical
+    - id: cles-ordinaires-x3
+      poids: 15
+      prix: 400000
+      objet:
+        materiau: TRIPWIRE_HOOK
+        quantite: 3
+        nom: "&eClé Ordinaire"
+        brillant: true
+      commandes:
+        - shcrates givekey %player% ordinaire 3 physical
+    - id: spawner-mystere-commun
+      poids: 12
+      prix: 300000
+      objet:
+        materiau: ENDER_CHEST
+        quantite: 1
+        nom: "&6Spawner Mystère &7(&eCommun&7)"
+      commandes:
+        - voucher give mysteryspawner1 1 %player%
+    - id: spawner-mystere-rare
+      poids: 6
+      prix: 1000000
+      objet:
+        materiau: ENDER_CHEST
+        quantite: 1
+        nom: "&6Spawner Mystère &7(&5Rare&7)"
+      commandes:
+        - voucher give mysteryspawner2 1 %player%
+    - id: coffre-ameliore-moyen
+      poids: 4
+      prix: 600000
+      objet:
+        materiau: CHEST
+        quantite: 1
+        nom: "&6Coffre amélioré &f(&6Moyen&f)"
+      commandes:
+        - advancedchests give %player% moyen 1
+    - id: tete-de-wither
+      poids: 4
+      prix: 500000
+      objet:
+        materiau: WITHER_SKELETON_SKULL
+        quantite: 1
+        nom: "&fTête de Wither"
+      commandes:
+        - minecraft:give %player% wither_skeleton_skull 1
+    - id: ardoises-renforcees-x5
+      poids: 6
+      prix: 1800000
+      objet:
+        materiau: REINFORCED_DEEPSLATE
+        quantite: 5
+        nom: "&fArdoise des abîmes renforcée"
+      commandes:
+        - minecraft:give %player% reinforced_deepslate 5
+    - id: ancre-teleportation
+      poids: 5
+      prix: 1200000
+      objet:
+        materiau: RESPAWN_ANCHOR
+        quantite: 1
+        nom: "&5Ancre de Téléportation"
+      commandes:
+        - shanchors give %player% 1
+    - id: oeuf-de-dragon
+      poids: 5
+      prix: 1800000
+      objet:
+        materiau: DRAGON_EGG
+        quantite: 1
+        nom: "&5Œuf de dragon"
+      commandes:
+        - minecraft:give %player% dragon_egg 1
+    - id: livre-legendaire
+      poids: 3
+      prix: 3500000
+      objet:
+        materiau: BOOK
+        quantite: 1
+        nom: "&7Enchantement &5&lLégendaire"
+      commandes:
+        - shenchants give rcbook %player% legendaire 1
+    - id: entonnoir
+      poids: 3
+      prix: 8000000
+      objet:
+        materiau: HOPPER
+        quantite: 1
+        nom: "&fEntonnoir"
+      commandes:
+        - minecraft:give %player% hopper 1
+    - id: cle-rare
+      poids: 2
+      prix: 2000000
       objet:
         materiau: TRIPWIRE_HOOK
         quantite: 1
@@ -492,6 +640,21 @@ logs:
   encheres-serveur-sans-offre:
     file: "encheres-serveur"
     format: "%item% -> enchère du serveur terminée sans offre (départ %price% SHCoins)"
+  # Vente du serveur mise en ligne.
+  # Variables : %lot%, %item% (avec la quantité), %price%, %duration%.
+  ventes-serveur-mise-en-vente:
+    file: "ventes-serveur"
+    format: "%lot% -> mis en vente par le serveur : %item% (%price% SHCoins, durée %duration%)"
+  # Lot d'une vente du serveur remis à l'acheteur (commandes lancées), tout de suite ou quand il le récupère.
+  # Variables : %player%, %lot%, %item%.
+  ventes-serveur-livraison:
+    file: "ventes-serveur"
+    format: "%player% -> reçoit le lot %lot% (%item%)"
+  # Vente du serveur terminée sans acheteur.
+  # Variables : %item%, %price%.
+  ventes-serveur-invendue:
+    file: "ventes-serveur"
+    format: "%item% -> vente du serveur terminée sans acheteur (%price% SHCoins)"
   # Annonce retirée par son vendeur.
   # Variables : %player%, %amount%, %item%.
   retraits:

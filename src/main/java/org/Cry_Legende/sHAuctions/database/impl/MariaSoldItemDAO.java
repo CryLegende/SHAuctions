@@ -135,22 +135,6 @@ public class MariaSoldItemDAO implements SoldItemDAO {
     }
 
     @Override
-    public int countPurchasesFrom(UUID sellerUuid, UUID buyerUuid, long since) {
-        try (Connection c = db.getConnection();
-             PreparedStatement ps = c.prepareStatement("SELECT COUNT(*) FROM " + T + " WHERE seller_uuid = ? AND buyer_uuid = ? AND sold_timestamp >= ?")) {
-            ps.setString(1, sellerUuid.toString());
-            ps.setString(2, buyerUuid.toString());
-            ps.setLong(3, since);
-            try (ResultSet rs = ps.executeQuery()) {
-                return rs.next() ? rs.getInt(1) : 0;
-            }
-        } catch (SQLException e) {
-            logger.log(Level.SEVERE, "Error counting purchases of " + buyerUuid + " from " + sellerUuid, e);
-            return 0;
-        }
-    }
-
-    @Override
     public List<SoldItem> getGlobalSalesHistory(int page, int itemsPerPage) {
         return page("SELECT " + COLUMNS + " FROM " + T + order(), page, itemsPerPage, null);
     }
