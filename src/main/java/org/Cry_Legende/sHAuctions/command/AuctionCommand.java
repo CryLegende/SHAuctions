@@ -35,6 +35,7 @@ public class AuctionCommand implements CommandExecutor, TabCompleter {
         // (Elles seront créées dans des fichiers séparés)
         registerSubCommand(new SellCommand(plugin));
         registerSubCommand(new BidCommand(plugin));
+        registerSubCommand(new BidsPageCommand(plugin));
         registerSubCommand(new ReloadCommand(plugin));
         registerSubCommand(new HistoryCommand(plugin));
         registerSubCommand(new ExpiredCommand(plugin));

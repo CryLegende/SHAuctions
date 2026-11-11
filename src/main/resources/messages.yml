@@ -240,3 +240,27 @@ recherche_lore_action: '&7&o(( &f&oClic gauche &7&opour contacter l''auteur &7&o
 recherche_lore_action_vous: '&7&o(( &c&oClic droit &7&opour supprimer votre recherche &7&o))'
 recherche_lore_action_staff: '&7&o(( &f&oClic gauche &7&o: contacter, &c&oclic droit &7&o: supprimer &7&o))'
 recherche_lore_action_annuler: '&7&o(( &c&oCliquez &7&opour annuler cette recherche &7&o))'
+
+# --- Enchères du serveur (section encheres-serveur de config.yml) ---
+# Annonce d'une nouvelle enchère du serveur, cliquable (ouvre /hdv encheres) ; %item_name% est survolable.
+# %item_name% %seller% %price% (départ) %duration% (temps restant)
+server_auction_start: '&7&l« &e&lSH &8&l» &e%seller% &7met aux enchères &e%item_name% &7(départ &e%price%&7, fin dans &e%duration%&7). &eCliquez ici &7pour enchérir !'
+server_auction_start_hover: '&7Cliquez pour ouvrir la page des &eenchères&7.'
+# Résultat annoncé à tout le serveur. %player% %item_name% %price%
+server_auction_result: '&7&l« &a&lSH &8&l» &a%player% &7remporte &a%item_name% &7aux enchères du serveur pour &a%price%&7.'
+server_auction_cap_reached: '&7&l« &c&lSH &8&l» &7Limite atteinte : &c%cap% enchères du serveur &7par semaine, remportées ou en tête. Nouvelle chance &clundi&7.'
+server_auctions_inactive: '&7&l« &6&lSH &8&l» &7Les enchères du serveur sont &6désactivées &7sur ce serveur (&6encheres-serveur.actif&7).'
+server_plan_header: '&7&l« &e&lSH &8&l» &7Enchères du serveur, semaine du &e%week% &7: &e%count% &7au planning, &e%cap% &7gagnée(s) au plus par joueur.'
+server_plan_line: ' &8• &e%date% &7pendant &e%duration% &8- %status%'
+server_plan_status:
+  prevue: '&eprévue'
+  lancee: '&alancée &7(%lot%)'
+  annulee: '&cretirée'
+  manquee: '&6manquée &7(serveur éteint ou aucun lot)'
+  forcee: '&alancée à la main &7(%lot%)'
+server_plan_empty: '&7&l« &e&lSH &8&l» &7Aucune enchère du serveur au planning cette semaine.'
+server_launch_usage: '&7&l« &c&lSH &8&l» &7Utilisation : &e/shauctions launch <lot|random> [durée]&7.'
+server_launch_unknown_lot: '&7&l« &c&lSH &8&l» &7Lot &c%lot% &7inconnu. Lots : &e%lots%&7.'
+server_launch_done: '&7&l« &a&lSH &8&l» &7Enchère du serveur lancée : lot &a%lot% &7pendant &a%duration%&7.'
+server_skip_done: '&7&l« &a&lSH &8&l» &7Enchère du serveur du &a%date% &7retirée du planning.'
+server_skip_none: '&7&l« &e&lSH &8&l» &7Aucune enchère du serveur prévue d''ici la fin de la semaine.'

@@ -14,6 +14,7 @@ import org.Cry_Legende.sHAuctions.event.AuctionItemListedEvent;
 import org.Cry_Legende.sHAuctions.event.AuctionItemPurchasedEvent;
 import org.Cry_Legende.sHAuctions.model.AuctionItem;
 import org.Cry_Legende.sHAuctions.model.ExpiredItem;
+import org.Cry_Legende.sHAuctions.serverauction.ServerAuctionManager;
 import org.Cry_Legende.sHAuctions.util.ActionLog;
 import org.Cry_Legende.sHAuctions.util.ItemUtil;
 import org.Cry_Legende.sHAuctions.util.SerializationUtil;
@@ -31,6 +32,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -85,7 +87,7 @@ public class AuctionManager {
         }
     }
 
-    String getItemNameForMessage(ItemStack item) {
+    public String getItemNameForMessage(ItemStack item) {
         if (item == null || item.getType().isAir()) {
             return "Objet Inconnu";
         }
@@ -97,7 +99,7 @@ public class AuctionManager {
      * Écrit une ligne dans SHLogs : fichier et format lus dans la section logs de config.yml,
      * variables passées par paires (nom, valeur).
      */
-    void writeLog(String key, String defaultFile, String defaultFormat, String... variables) {
+    public void writeLog(String key, String defaultFile, String defaultFormat, String... variables) {
         String line = configManager.getString("logs." + key + ".format", defaultFormat);
         for (int i = 0; i + 1 < variables.length; i += 2) {
             line = line.replace(variables[i], String.valueOf(variables[i + 1]));
@@ -108,7 +110,7 @@ public class AuctionManager {
     /**
      * Montant écrit tel quel dans les logs : exact, sans abréviation (1,234,567.5).
      */
-    static String logPrice(double price) {
+    public static String logPrice(double price) {
         return new java.text.DecimalFormat("#,##0.##", java.text.DecimalFormatSymbols.getInstance(Locale.US)).format(price);
     }
 
@@ -162,11 +164,29 @@ public class AuctionManager {
 
     /** Affiche l'annonce d'une enchère aux joueurs de ce serveur. */
     void sendBidAnnouncement(String sellerName, AuctionItem auctionItem) {
+        if (auctionItem.isServerAuction()) {
+            plugin.getServerAuctions().sendStartAnnouncement(auctionItem);
+            return;
+        }
         ItemStack item = auctionItem.getItemStack();
-        String itemName = getItemNameForMessage(item);
+        Map<String, String> placeholders = new HashMap<>();
+        placeholders.put("player", sellerName);
+        placeholders.put("price", economyProvider.formatCurrencyDetailed(auctionItem.getPrice()));
+        // On garde %item_name% littéral pour le remplacer par le composant survolable.
+        String template = messageManager.getMessage("bid_announcement", false, placeholders);
+        TextComponent message = itemAnnouncement(template, item, getItemNameForMessage(item), null, null);
+        for (Player online : Bukkit.getOnlinePlayers()) {
+            online.spigot().sendMessage(message);
+        }
+    }
 
+    /**
+     * Ligne d'annonce : %item_name% devient le nom de l'objet, survolable (nom et description). Avec une commande,
+     * toute la ligne est cliquable et le reste de la ligne affiche {@code clickHover} au survol.
+     */
+    public TextComponent itemAnnouncement(String template, ItemStack item, String itemLabel, String clickCommand, String clickHover) {
         // Construction du survol : nom coloré + lore.
-        StringBuilder hoverText = new StringBuilder(itemName);
+        StringBuilder hoverText = new StringBuilder(itemLabel);
         if (item != null) {
             ItemMeta meta = item.getItemMeta();
             if (meta != null && meta.hasLore()) {
@@ -175,48 +195,64 @@ public class AuctionManager {
                 }
             }
         }
-
-        Map<String, String> placeholders = new HashMap<>();
-        placeholders.put("player", sellerName);
-        placeholders.put("price", economyProvider.formatCurrencyDetailed(auctionItem.getPrice()));
-        // On garde %item_name% littéral pour le remplacer par le composant survolable.
-        String template = messageManager.getMessage("bid_announcement", false, placeholders);
-
         // Nom affiché en jaune (&e) pour rester cohérent avec le reste de l'annonce, à moins que
         // l'item n'ait déjà ses propres codes couleur (qui prendront alors le dessus).
-        String coloredName = "\u00A7e" + itemName;
+        TextComponent nameComp = new TextComponent(TextComponent.fromLegacyText("\u00A7e" + itemLabel));
+        nameComp.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
+            new Text(TextComponent.fromLegacyText(hoverText.toString()))));
 
-        TextComponent message = new TextComponent();
+        List<TextComponent> parts = new ArrayList<>();
         String marker = "%item_name%";
         int idx = template.indexOf(marker);
         if (idx < 0) {
             // Pas de marqueur : on ajoute le nom survolable à la fin.
-            message.addExtra(new TextComponent(TextComponent.fromLegacyText(template + " ")));
-            idx = -1;
-        }
-        if (idx >= 0) {
+            parts.add(new TextComponent(TextComponent.fromLegacyText(template + " ")));
+            parts.add(nameComp);
+        } else {
             String before = template.substring(0, idx);
             String after = template.substring(idx + marker.length());
             if (!before.isEmpty()) {
-                message.addExtra(new TextComponent(TextComponent.fromLegacyText(before)));
+                parts.add(new TextComponent(TextComponent.fromLegacyText(before)));
             }
-            TextComponent nameComp = new TextComponent(TextComponent.fromLegacyText(coloredName));
-            nameComp.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
-                new Text(TextComponent.fromLegacyText(hoverText.toString()))));
-            message.addExtra(nameComp);
+            parts.add(nameComp);
             if (!after.isEmpty()) {
-                message.addExtra(new TextComponent(TextComponent.fromLegacyText(after)));
+                parts.add(new TextComponent(TextComponent.fromLegacyText(after)));
             }
-        } else {
-            TextComponent nameComp = new TextComponent(TextComponent.fromLegacyText(coloredName));
-            nameComp.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
-                new Text(TextComponent.fromLegacyText(hoverText.toString()))));
-            message.addExtra(nameComp);
         }
+        TextComponent message = new TextComponent();
+        for (TextComponent part : parts) {
+            if (clickCommand != null) {
+                part.setClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, clickCommand));
+                if (part != nameComp && clickHover != null && !clickHover.isEmpty()) {
+                    part.setHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, new Text(TextComponent.fromLegacyText(clickHover))));
+                }
+            }
+            message.addExtra(part);
+        }
+        return message;
+    }
 
-        for (Player online : Bukkit.getOnlinePlayers()) {
-            online.spigot().sendMessage(message);
+    /**
+     * Écart minimal entre deux mises : celui du lot pour une enchère du serveur, sinon bids.min_bid_increment.
+     */
+    public double minBidIncrement(AuctionItem auction) {
+        double global = configManager.getDouble("bids.min_bid_increment", 1.0);
+        if (auction == null || !auction.isServerAuction()) {
+            return global;
         }
+        ServerAuctionManager.LotData lot = plugin.getServerAuctions().lotOf(auction.getItemStack());
+        return lot != null && lot.increment() > 0 ? lot.increment() : global;
+    }
+
+    /** Ligne SHLogs d'une mise acceptée. */
+    void logBid(Player bidder, AuctionItem auction, double amount) {
+        ItemStack item = auction.getItemStack();
+        writeLog("mises", "encheres", "%player% -> mise %price% SHCoins sur %amount% x %item% de %seller%",
+            "%player%", bidder.getName(),
+            "%seller%", auction.getSellerName(),
+            "%amount%", String.valueOf(item != null ? item.getAmount() : 1),
+            "%item%", org.bukkit.ChatColor.stripColor(getItemNameForMessage(item)),
+            "%price%", logPrice(amount));
     }
 
     public boolean createAuction(Player seller, ItemStack itemInHand, double price, long durationInSeconds) {
@@ -439,10 +475,13 @@ public class AuctionManager {
                 messageManager.sendMessage(bidder, "already_highest_bidder");
                 return false;
             }
-            double minIncrement = configManager.getDouble("bids.min_bid_increment", 1.0);
+            double minIncrement = minBidIncrement(auction);
             double minRequired = auction.hasBid() ? auction.getHighestBid() + minIncrement : auction.getStartingPrice();
             if (amount < minRequired) {
                 messageManager.sendMessage(bidder, "bid_too_low", Collections.singletonMap("min_bid", economyProvider.formatCurrency(minRequired)));
+                return false;
+            }
+            if (!plugin.getServerAuctions().mayBid(bidder, auction)) {
                 return false;
             }
             if (!economyProvider.isEconomyReady()) {
@@ -509,6 +548,7 @@ public class AuctionManager {
                 }
             }
 
+            logBid(bidder, auction, amount);
             if (configManager.getBoolean("misc.log_transactions", true)) {
                 plugin.getLogger().info(String.format("ENCHÈRE: %s a enchéri %s sur l'enchère %d.",
                     bidder.getName(), economyProvider.formatCurrency(amount), auctionId));
@@ -689,9 +729,10 @@ public class AuctionManager {
         }
 
         OfflinePlayer sellerOffline = Bukkit.getOfflinePlayer(auctionItem.getSellerUuid());
-        boolean itemReturnedDirectly = false;
+        // Enchère du serveur : l'objet affiché n'est rendu à personne
+        boolean itemReturnedDirectly = auctionItem.isServerAuction();
         // Une annulation staff force le passage par les invendus pour que le vendeur voie la raison.
-        if (!isStaffCancel && sellerOffline.isOnline() && sellerOffline.getPlayer() != null) {
+        if (!itemReturnedDirectly && !isStaffCancel && sellerOffline.isOnline() && sellerOffline.getPlayer() != null) {
             Player sellerOnline = sellerOffline.getPlayer();
             if (sellerOnline.getInventory().firstEmpty() != -1) {
                 giveOrDrop(sellerOnline, itemToReturn.clone());
@@ -778,6 +819,16 @@ public class AuctionManager {
                 continue;
             }
 
+            // Enchère du serveur sans offre : l'annonce disparaît, rien n'est rendu
+            if (auctionItem.isServerAuction()) {
+                if (auctionDAO.removeAuction(auctionItem.getId())) {
+                    invalidateDialogs(auctionItem.getId());
+                    plugin.getServerAuctions().endedWithoutBid(auctionItem, itemStack);
+                    processedCount++;
+                }
+                continue;
+            }
+
             // Copier les données pour l'événement avant toute modification
             final AuctionItem auctionItemSnapshot = new AuctionItem(auctionItem.getId(), auctionItem.getSellerUuid(), auctionItem.getSellerName(), itemStack.clone(), auctionItem.getPrice(), auctionItem.getListTimestamp(), auctionItem.getExpireTimestamp());
             final String itemNameForMsgsAndLogs = getItemNameForMessage(itemStack);
@@ -845,16 +896,18 @@ public class AuctionManager {
         final String winnerName = auction.getHighestBidderName();
         final String itemName = getItemNameForMessage(itemStack);
 
+        // Enchère du serveur : l'offre gagnante (déjà prélevée) n'est versée à personne
+        final boolean server = auction.isServerAuction();
         // Payer le vendeur (offline-safe).
         OfflinePlayer seller = Bukkit.getOfflinePlayer(auction.getSellerUuid());
-        if (!economyProvider.deposit(seller, winningBid)) {
+        if (!server && !economyProvider.deposit(seller, winningBid)) {
             plugin.getLogger().severe("Failed to deposit winning bid to seller for bid auction " + auction.getId() + ". Will retry next cycle.");
             return false;
         }
         // Retirer l'enchère avant de livrer : si elle a déjà disparu (ou erreur base), on reprend le paiement
         // et on réessaiera au prochain passage, sans jamais livrer deux fois.
         if (!auctionDAO.removeAuction(auction.getId())) {
-            if (!economyProvider.withdraw(seller, winningBid)) {
+            if (!server && !economyProvider.withdraw(seller, winningBid)) {
                 plugin.getLogger().severe("Critical error: bid auction " + auction.getId() + " could not be removed and the payment of "
                     + economyProvider.formatCurrency(winningBid) + " could not be taken back from seller " + auction.getSellerUuid() + ". Manual check needed.");
             }
@@ -864,8 +917,9 @@ public class AuctionManager {
         invalidateDialogs(auction.getId());
 
         // Enregistrer dans l'historique des ventes.
-        boolean sellerOnline = seller.isOnline() && seller.getPlayer() != null;
-        soldItemDAO.addSoldItem(auction.getId(), auction.getSellerUuid(), auction.getSellerName(), winnerUuid, winnerName, itemName, itemStack, winningBid, "BID", sellerOnline);
+        boolean sellerOnline = !server && seller.isOnline() && seller.getPlayer() != null;
+        soldItemDAO.addSoldItem(auction.getId(), auction.getSellerUuid(), auction.getSellerName(), winnerUuid, winnerName, itemName, itemStack, winningBid, "BID",
+            server || sellerOnline);
 
         // Remettre l'item au gagnant ; sinon dans ses invendus.
         final ItemStack winnerItem = itemStack.clone();
@@ -875,7 +929,11 @@ public class AuctionManager {
         OfflinePlayer winner = Bukkit.getOfflinePlayer(winnerUuid);
         boolean givenDirectly = false;
         if (winner.isOnline() && winner.getPlayer() != null && winner.getPlayer().getInventory().firstEmpty() != -1) {
-            giveOrDrop(winner.getPlayer(), winnerItem.clone());
+            if (server) {
+                plugin.getServerAuctions().deliver(winner.getPlayer(), winnerItem, originalId);
+            } else {
+                giveOrDrop(winner.getPlayer(), winnerItem.clone());
+            }
             givenDirectly = true;
             Map<String, String> ph = new HashMap<>();
             ph.put("item_name", itemName);
@@ -907,6 +965,9 @@ public class AuctionManager {
             ph.put("buyer", winnerName != null ? winnerName : "?");
             messageManager.sendMessage(seller.getPlayer(), "bid_sold_to_winner", ph);
             playSound(seller.getPlayer(), configManager.getString("misc.sound_on_sell"));
+        }
+        if (server) {
+            plugin.getServerAuctions().announceResult(winnerName != null ? winnerName : "?", itemStack, winningBid);
         }
         Bukkit.getServer().getPluginManager().callEvent(new AuctionItemPurchasedEvent(snapshot, winner.getPlayer()));
 
@@ -960,7 +1021,10 @@ public class AuctionManager {
 
         // Marquer d'abord (UPDATE conditionnel) : si la base échoue, l'item n'est pas donné
         if (expiredItemDAO.markAsClaimed(expiredItemId)) {
-            giveOrDrop(player, itemStack.clone());
+            // Lot d'une enchère du serveur : ses commandes, jamais l'objet affiché
+            if (!plugin.getServerAuctions().deliver(player, itemStack, expiredItem.getOriginalAuctionId())) {
+                giveOrDrop(player, itemStack.clone());
+            }
             String itemNameForMsgsAndLogs = getItemNameForMessage(itemStack);
             writeLog("retraits-invendus", "retraits", "%player% -> récupère ses invendus (%amount% x %item%)",
                 "%player%", player.getName(),
@@ -994,7 +1058,7 @@ public class AuctionManager {
         // TODO: Enchantment blacklist
     }
 
-    void playSound(Player player, String soundName) {
+    public void playSound(Player player, String soundName) {
         if (soundName == null || soundName.trim().isEmpty() || "NONE".equalsIgnoreCase(soundName)) return;
         Sound sound = ConfigManager.sound(soundName);
         if (sound != null) {
@@ -1046,8 +1110,13 @@ public class AuctionManager {
     void rescueItem(UUID ownerUuid, ItemStack item, long auctionId) {
         Player owner = Bukkit.getPlayer(ownerUuid);
         if (owner != null && owner.isOnline()) {
-            giveOrDrop(owner, item.clone());
+            if (!plugin.getServerAuctions().deliver(owner, item, auctionId)) {
+                giveOrDrop(owner, item.clone());
+            }
             plugin.getLogger().warning("Item of auction " + auctionId + " could not be stored in expired items; given directly to " + owner.getName() + ".");
+        } else if (plugin.getServerAuctions().lotOf(item) != null) {
+            plugin.getLogger().severe("Critical error: server auction lot " + auctionId + " could not be stored in expired items for winner " + ownerUuid
+                + ". Run by hand once they are online: " + plugin.getServerAuctions().commandsFor(item, "<pseudo>"));
         } else {
             plugin.getLogger().severe("Critical error: item of auction " + auctionId + " could not be stored in expired items for owner " + ownerUuid
                 + ". Serialized item: " + SerializationUtil.serializeItemStack(item));

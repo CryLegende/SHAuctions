@@ -199,6 +199,22 @@ public class SQLiteSoldItemDAO implements SoldItemDAO {
     }
 
     @Override
+    public int countPurchasesFrom(UUID sellerUuid, UUID buyerUuid, long since) {
+        String sql = "SELECT COUNT(*) FROM sold_items WHERE seller_uuid = ? AND buyer_uuid = ? AND sold_timestamp >= ?";
+        try (PreparedStatement pstmt = dbManager.getConnection().prepareStatement(sql)) {
+            pstmt.setString(1, sellerUuid.toString());
+            pstmt.setString(2, buyerUuid.toString());
+            pstmt.setLong(3, since);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                return rs.next() ? rs.getInt(1) : 0;
+            }
+        } catch (SQLException e) {
+            plugin.getLogger().log(Level.SEVERE, "Error counting purchases of " + buyerUuid + " from " + sellerUuid, e);
+            return 0;
+        }
+    }
+
+    @Override
     public List<SoldItem> getGlobalSalesHistory(int page, int itemsPerPage) {
         String sortOrderConfig = plugin.getConfigManager().getString("display_options.sales_history_sort_order", "DESC").toUpperCase();
         String orderByClause = "ORDER BY sold_timestamp " + ("ASC".equals(sortOrderConfig) ? "ASC" : "DESC");

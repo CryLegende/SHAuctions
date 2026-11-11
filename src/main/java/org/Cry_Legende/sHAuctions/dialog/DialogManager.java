@@ -227,7 +227,7 @@ public final class DialogManager {
     private Map<String, Component> placeholders(AuctionItem auction) {
         ConfigManager config = plugin.getConfigManager();
         MessageManager messages = plugin.getMessageManager();
-        double minIncrement = config.getDouble("bids.min_bid_increment", 1.0);
+        double minIncrement = plugin.getAuctionManager().minBidIncrement(auction);
         double nextMin = auction.hasBid() ? auction.getHighestBid() + minIncrement : auction.getStartingPrice();
         Map<String, Component> map = new HashMap<>();
         map.put("item_name", SECTION.deserialize(itemName(auction.getItemStack())));

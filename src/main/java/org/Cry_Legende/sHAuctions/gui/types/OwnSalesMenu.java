@@ -186,7 +186,7 @@ public class OwnSalesMenu extends AbstractMenu {
         placeholders.put("{HighestBidder}", auctionItem.hasBid() && auctionItem.getHighestBidderName() != null
             ? auctionItem.getHighestBidderName()
             : configManager.getString("bids.no_bidder_placeholder", "—"));
-        double minIncrement = configManager.getDouble("bids.min_bid_increment", 1.0);
+        double minIncrement = plugin.getAuctionManager().minBidIncrement(auctionItem);
         double nextMin = auctionItem.hasBid() ? auctionItem.getHighestBid() + minIncrement : auctionItem.getStartingPrice();
         placeholders.put("{NextMinBid}", PriceFormatterUtil.formatPrice(nextMin));
         // Le lore dans le YML (auction_item_format) contiendra typiquement "&cCliquez pour annuler"

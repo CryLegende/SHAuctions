@@ -175,7 +175,7 @@ public class BidHouseMenu extends AbstractMenu {
         placeholders.put("{HighestBidder}", auctionItem.hasBid() && auctionItem.getHighestBidderName() != null
             ? auctionItem.getHighestBidderName()
             : configManager.getString("bids.no_bidder_placeholder", "—"));
-        double minIncrement = configManager.getDouble("bids.min_bid_increment", 1.0);
+        double minIncrement = plugin.getAuctionManager().minBidIncrement(auctionItem);
         double nextMin = auctionItem.hasBid() ? auctionItem.getHighestBid() + minIncrement : auctionItem.getStartingPrice();
         placeholders.put("{NextMinBid}", PriceFormatterUtil.formatPrice(nextMin));
         return placeholders;
@@ -234,7 +234,7 @@ public class BidHouseMenu extends AbstractMenu {
         // Placer le joueur en attente de saisie du montant.
         plugin.getChatInputManager().awaitBid(viewer.getUniqueId(), auctionItem.getId());
         viewer.closeInventory();
-        double minIncrement = configManager.getDouble("bids.min_bid_increment", 1.0);
+        double minIncrement = plugin.getAuctionManager().minBidIncrement(auctionItem);
         double nextMin = auctionItem.hasBid() ? auctionItem.getHighestBid() + minIncrement : auctionItem.getStartingPrice();
         Map<String, String> ph = new java.util.HashMap<>();
         ph.put("item_name", ItemUtil.getItemName(auctionItem.getItemStack()) != null ? ItemUtil.getItemName(auctionItem.getItemStack()) : ItemUtil.getMaterialNameFallback(auctionItem.getItemStack().getType()));

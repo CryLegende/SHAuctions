@@ -26,6 +26,8 @@ public class AuctionItem {
 
     public static final String TYPE_SALE = "SALE";
     public static final String TYPE_BID = "BID";
+    /** Vendeur des enchères du serveur : l'offre gagnante n'est versée à personne. */
+    public static final UUID SERVER_SELLER = new UUID(0L, 0L);
 
     /**
      * Constructeur pour charger un AuctionItem depuis la base de données.
@@ -182,6 +184,13 @@ public class AuctionItem {
      */
     public boolean isBid() {
         return TYPE_BID.equalsIgnoreCase(type);
+    }
+
+    /**
+     * True si c'est une enchère du serveur (vendeur {@link #SERVER_SELLER}).
+     */
+    public boolean isServerAuction() {
+        return SERVER_SELLER.equals(sellerUuid);
     }
 
     /**

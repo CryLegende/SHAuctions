@@ -23,6 +23,7 @@ import org.Cry_Legende.sHAuctions.manager.SharedFlows;
 import org.Cry_Legende.sHAuctions.model.MenuDefinition;
 import org.Cry_Legende.sHAuctions.network.NetBus;
 import org.Cry_Legende.sHAuctions.network.ShNetworkBus;
+import org.Cry_Legende.sHAuctions.serverauction.ServerAuctionManager;
 import org.Cry_Legende.sHAuctions.task.ExpirationTask;
 import org.Cry_Legende.sHAuctions.task.RealTimeLoreUpdateTask;
 import org.Cry_Legende.sHAuctions.util.SerializationUtil;
@@ -62,6 +63,8 @@ public class SHAuctions extends JavaPlugin {
     private RealTimeLoreUpdateTask realTimeLoreUpdateTask;
     // Mode réseau (SHNetwork présent) : base MariaDB commune, échéances sur le serveur meneur ; null sinon
     private SharedFlows sharedFlows;
+    // Enchères du serveur (planning, lots, règlement)
+    private ServerAuctionManager serverAuctions;
 
     @Override
     public void onEnable() {
@@ -131,6 +134,7 @@ public class SHAuctions extends JavaPlugin {
         chatInputManager = new ChatInputManager();
         auctionManager = new AuctionManager(this);
         wantedManager = new org.Cry_Legende.sHAuctions.wanted.WantedManager(this);
+        serverAuctions = new ServerAuctionManager(this);
         if (bus != null) {
             sharedFlows = new SharedFlows(this, auctionManager, bus, databaseManager.getSharedAuctions(),
                 configManager.getString("reseau.canal", "shauctions"));
@@ -171,6 +175,7 @@ public class SHAuctions extends JavaPlugin {
         getLogger().info("Listeners registered.");
 
         scheduleExpirationTask();
+        serverAuctions.enable();
 
         realTimeLoreUpdateTask = new RealTimeLoreUpdateTask(this);
         // Rafraîchissement du lore toutes les 2s (40 ticks) : le temps restant en secondes reste
@@ -198,6 +203,9 @@ public class SHAuctions extends JavaPlugin {
             expirationTask.cancel();
             expirationTask = null;
             getLogger().info("ExpirationTask cancelled.");
+        }
+        if (serverAuctions != null) {
+            serverAuctions.disable();
         }
         if (sharedFlows != null) {
             sharedFlows.disable();
@@ -284,6 +292,7 @@ public class SHAuctions extends JavaPlugin {
         messageManager.apply(newMessages);
         menuConfigManager.apply(newMenus);
         scheduleExpirationTask();
+        serverAuctions.onReload();
         long duration = System.currentTimeMillis() - start;
         messageManager.sendMessage(sender, "reload_success", Map.of("duration", String.valueOf(duration)));
         messageManager.sendMessage(sender, "reload_restart_note");
@@ -374,6 +383,16 @@ public class SHAuctions extends JavaPlugin {
     /** Onglet « Recherches » de l'HDV. */
     public org.Cry_Legende.sHAuctions.wanted.WantedManager getWantedManager() {
         return wantedManager;
+    }
+
+    /** Enchères du serveur. */
+    public ServerAuctionManager getServerAuctions() {
+        return serverAuctions;
+    }
+
+    /** Mode réseau, ou null sur un serveur seul. */
+    public SharedFlows getSharedFlows() {
+        return sharedFlows;
     }
 
     public MenuRefreshListener getMenuRefreshListener() {

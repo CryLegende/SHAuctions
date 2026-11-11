@@ -127,7 +127,8 @@ public class ChatInputListener implements Listener {
         AuctionItem auction = plugin.getDatabaseManager().getAuctionDAO().getAuctionById(auctionId);
         return auction != null && auction.isBid() && !auction.isExpired()
                 && !auction.getSellerUuid().equals(player.getUniqueId())
-                && !(auction.hasBid() && player.getUniqueId().equals(auction.getHighestBidderUuid()));
+                && !(auction.hasBid() && player.getUniqueId().equals(auction.getHighestBidderUuid()))
+                && !plugin.getServerAuctions().capReached(player, auction);
     }
 
     /** Montant saisi : virgule décimale et espaces tolérés, fini et strictement positif (sinon null). */

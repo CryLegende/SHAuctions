@@ -89,6 +89,17 @@ public interface SoldItemDAO {
     int countPurchasesByBuyer(UUID buyerUuid);
 
     /**
+     * Compte ce qu'un acheteur a acheté ou remporté chez un vendeur depuis un instant donné
+     * (enchères du serveur gagnées dans la semaine).
+     *
+     * @param sellerUuid L'UUID du vendeur.
+     * @param buyerUuid  L'UUID de l'acheteur.
+     * @param since      Timestamp Unix (secondes) à partir duquel compter.
+     * @return Le nombre de ventes.
+     */
+    int countPurchasesFrom(UUID sellerUuid, UUID buyerUuid, long since);
+
+    /**
      * Récupère l'historique global des ventes (pour les admins).
      *
      * @param page         Le numéro de la page.

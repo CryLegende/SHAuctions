@@ -22,11 +22,11 @@ import java.util.logging.Level;
 
 /**
  * /shauctions : administration du plugin, console comprise. Chaque sous-commande a sa permission
- * {@code shauctions.admin.<nom>}.
+ * {@code shauctions.admin.<nom>}. plan, launch et skip gèrent les enchères du serveur.
  */
 public class AdminCommand implements TabExecutor {
 
-    private static final List<String> SUBCOMMANDS = List.of("reload", "info");
+    private static final List<String> SUBCOMMANDS = List.of("reload", "info", "plan", "launch", "skip");
 
     private final SHAuctions plugin;
 
@@ -65,10 +65,18 @@ public class AdminCommand implements TabExecutor {
             messages.sendMessage(sender, "no_permission");
             return true;
         }
-        if (sub.equals("reload")) {
-            plugin.reloadAll(sender);
-        } else {
-            info(sender, args);
+        switch (sub) {
+            case "reload" -> plugin.reloadAll(sender);
+            case "info" -> info(sender, args);
+            case "plan" -> plugin.getServerAuctions().sendPlan(sender);
+            case "launch" -> {
+                if (args.length < 2) {
+                    messages.sendMessage(sender, "server_launch_usage");
+                } else {
+                    plugin.getServerAuctions().launchNow(sender, args[1], args.length > 2 ? args[2] : null);
+                }
+            }
+            default -> plugin.getServerAuctions().skipNext(sender);
         }
         return true;
     }
@@ -150,6 +158,12 @@ public class AdminCommand implements TabExecutor {
             String start = args[1].toLowerCase(Locale.ROOT);
             return Bukkit.getOnlinePlayers().stream().map(Player::getName)
                 .filter(name -> name.toLowerCase(Locale.ROOT).startsWith(start)).toList();
+        }
+        if (args.length == 2 && args[0].equalsIgnoreCase("launch") && can(sender, "launch")) {
+            String start = args[1].toLowerCase(Locale.ROOT);
+            List<String> ids = new ArrayList<>(plugin.getServerAuctions().lotIds());
+            ids.add("random");
+            return ids.stream().filter(id -> id.toLowerCase(Locale.ROOT).startsWith(start)).toList();
         }
         return List.of();
     }

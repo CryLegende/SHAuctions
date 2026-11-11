@@ -197,7 +197,25 @@ public final class SharedFlows {
         o.addProperty("sellerUuid", auction.getSellerUuid().toString());
         o.addProperty("id", auction.getId());
         o.addProperty("price", auction.getPrice());
+        o.addProperty("expire", auction.getExpireTimestamp());
         o.addProperty("item", item);
+        bus.publish(channel, o);
+    }
+
+    /** Nouvelle enchère du serveur : menus ouverts et annonce sur les autres serveurs. */
+    public void serverListed(AuctionItem auction) {
+        changed("listed", auction.getId(), auction.getSellerUuid(), null);
+        announce(auction.getSellerName(), auction);
+    }
+
+    /** Message à tous les joueurs des autres serveurs (résultat d'une enchère du serveur). */
+    public void broadcast(String key, Map<String, String> placeholders) {
+        JsonObject o = new JsonObject();
+        o.addProperty("type", "broadcast");
+        o.addProperty("key", key);
+        JsonObject ph = new JsonObject();
+        placeholders.forEach(ph::addProperty);
+        o.add("ph", ph);
         bus.publish(channel, o);
     }
 
@@ -231,9 +249,19 @@ public final class SharedFlows {
                         UUID.fromString(text(o, "seller")), buyer == null ? null : UUID.fromString(buyer));
                 }
                 case "announce" -> {
+                    long expire = o.has("expire") ? o.get("expire").getAsLong() : 0L;
                     AuctionItem auction = new AuctionItem(o.get("id").getAsLong(), UUID.fromString(text(o, "sellerUuid")), text(o, "seller"),
-                        text(o, "item"), o.get("price").getAsDouble(), 0L, 0L, AuctionItem.TYPE_BID, -1, null, null);
+                        text(o, "item"), o.get("price").getAsDouble(), 0L, expire, AuctionItem.TYPE_BID, -1, null, null);
                     am.sendBidAnnouncement(text(o, "seller"), auction);
+                }
+                case "broadcast" -> {
+                    Map<String, String> ph = new HashMap<>();
+                    if (o.has("ph") && o.get("ph").isJsonObject()) {
+                        for (Map.Entry<String, JsonElement> e : o.getAsJsonObject("ph").entrySet()) {
+                            ph.put(e.getKey(), e.getValue().getAsString());
+                        }
+                    }
+                    plugin.getServerAuctions().broadcastLocal(text(o, "key"), ph);
                 }
                 default -> {
                     // type inconnu : message d'une version plus récente, ignoré
@@ -461,10 +489,13 @@ public final class SharedFlows {
             messages().sendMessage(bidder, "already_highest_bidder");
             return false;
         }
-        double minIncrement = config().getDouble("bids.min_bid_increment", 1.0);
+        double minIncrement = am.minBidIncrement(auction);
         double minRequired = auction.hasBid() ? auction.getHighestBid() + minIncrement : auction.getStartingPrice();
         if (amount < minRequired) {
             messages().sendMessage(bidder, "bid_too_low", Collections.singletonMap("min_bid", economy().formatCurrency(minRequired)));
+            return false;
+        }
+        if (!plugin.getServerAuctions().mayBid(bidder, auction)) {
             return false;
         }
         if (!economy().isEconomyReady()) {
@@ -555,6 +586,7 @@ public final class SharedFlows {
                 plugin.getLogger().info(String.format("ANTI-SNIPE: enchère %d prolongée de %ds (offre de dernière seconde).", auctionId, extension));
             }
         }
+        am.logBid(bidder, row, amount);
         if (config().getBoolean("misc.log_transactions", true)) {
             plugin.getLogger().info(String.format("ENCHÈRE: %s a enchéri %s sur l'enchère %d.", bidder.getName(), economy().formatCurrency(amount), auctionId));
         }
@@ -601,7 +633,8 @@ public final class SharedFlows {
 
         AuctionItem removed;
         try {
-            removed = auctions.cancel(auctionId, returnDirect ? null : new ExpiredEntry(now(), storedReason));
+            // Enchère du serveur : l'objet affiché n'est rangé chez personne
+            removed = auctions.cancel(auctionId, returnDirect || listed.isServerAuction() ? null : new ExpiredEntry(now(), storedReason));
         } catch (UncertainCommit e) {
             Boolean gone = auctions.isGone(auctionId);
             if (Boolean.TRUE.equals(gone)) {
@@ -746,7 +779,9 @@ public final class SharedFlows {
         UUID winnerUuid = row.getHighestBidderUuid();
         String winnerName = row.getHighestBidderName() != null ? row.getHighestBidderName() : "?";
         String itemName = am.getItemNameForMessage(item);
-        if (!economy().deposit(Bukkit.getOfflinePlayer(row.getSellerUuid()), winningBid)) {
+        // Enchère du serveur : l'offre gagnante (déjà prélevée) n'est versée à personne
+        boolean server = row.isServerAuction();
+        if (!server && !economy().deposit(Bukkit.getOfflinePlayer(row.getSellerUuid()), winningBid)) {
             plugin.getLogger().severe("Critical error: seller " + row.getSellerName() + " (" + row.getSellerUuid() + ") could not be paid "
                 + logPrice(winningBid) + " for won auction " + id + ". Pay by hand.");
         }
@@ -756,7 +791,11 @@ public final class SharedFlows {
         if (!settlement.winnerToExpired()) {
             Player winner = local(winnerUuid);
             if (winner != null) {
-                am.giveOrDrop(winner, item.clone());
+                if (server) {
+                    plugin.getServerAuctions().deliver(winner, item, id);
+                } else {
+                    am.giveOrDrop(winner, item.clone());
+                }
                 ph.put("price", economy().formatCurrency(winningBid));
                 messages().sendMessage(winner, "bid_won", ph);
                 am.playSound(winner, config().getString("misc.sound_on_purchase"));
@@ -772,11 +811,15 @@ public final class SharedFlows {
             "%amount%", String.valueOf(item.getAmount()),
             "%item%", itemName,
             "%price%", logPrice(winningBid));
-        Map<String, String> sellerPh = new HashMap<>();
-        sellerPh.put("item_name", itemName);
-        sellerPh.put("price", economy().formatCurrency(winningBid));
-        sellerPh.put("buyer", winnerName);
-        notify(row.getSellerUuid(), "bid_sold_to_winner", sellerPh, "misc.sound_on_sell");
+        if (server) {
+            plugin.getServerAuctions().announceResult(winnerName, item, winningBid);
+        } else {
+            Map<String, String> sellerPh = new HashMap<>();
+            sellerPh.put("item_name", itemName);
+            sellerPh.put("price", economy().formatCurrency(winningBid));
+            sellerPh.put("buyer", winnerName);
+            notify(row.getSellerUuid(), "bid_sold_to_winner", sellerPh, "misc.sound_on_sell");
+        }
         AuctionItem snapshot = new AuctionItem(id, row.getSellerUuid(), row.getSellerName(), item.clone(), winningBid, row.getListTimestamp(),
             row.getExpireTimestamp(), AuctionItem.TYPE_BID, winningBid, winnerUuid, row.getHighestBidderName());
         Bukkit.getPluginManager().callEvent(new AuctionItemPurchasedEvent(snapshot, local(winnerUuid)));
@@ -790,6 +833,11 @@ public final class SharedFlows {
         long id = row.getId();
         String itemName = am.getItemNameForMessage(item);
         am.invalidateDialogs(id);
+        if (row.isServerAuction()) {
+            plugin.getServerAuctions().endedWithoutBid(row, item);
+            changed("removed", id, row.getSellerUuid(), null);
+            return;
+        }
         plugin.getLogger().info(String.format("EXPIRATION: Enchère %d (%d x %s par %s) a expiré.", id, item.getAmount(), itemName, row.getSellerName()));
         notify(row.getSellerUuid(), "item_sent_to_expired", Collections.singletonMap("item_name", itemName), null);
         AuctionItem snapshot = new AuctionItem(id, row.getSellerUuid(), row.getSellerName(), item.clone(), row.getPrice(), row.getListTimestamp(),

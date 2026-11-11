@@ -563,7 +563,10 @@ public class MariaAuctionDAO implements AuctionDAO {
                     }
                     result = new Settlement(SettleKind.AWARDED, row, toExpired);
                 } else {
-                    insertExpired(c, id, row.getSellerUuid(), row.getSellerName(), row.getItemSerialized(), row.getExpireTimestamp(), null);
+                    // Enchère du serveur sans offre : rien à rendre, l'annonce disparaît simplement
+                    if (!row.isServerAuction()) {
+                        insertExpired(c, id, row.getSellerUuid(), row.getSellerName(), row.getItemSerialized(), row.getExpireTimestamp(), null);
+                    }
                     result = new Settlement(SettleKind.EXPIRED, row, true);
                 }
                 commit(c, result);
