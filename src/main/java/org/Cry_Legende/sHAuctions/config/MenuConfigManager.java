@@ -7,10 +7,12 @@ import org.Cry_Legende.sHAuctions.model.MenuDefinition;
 
 import org.bukkit.Material;
 import org.bukkit.configuration.ConfigurationSection;
+import org.bukkit.configuration.InvalidConfigurationException;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 
 import java.io.File;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
@@ -26,15 +28,38 @@ public class MenuConfigManager {
 
     private final SHAuctions plugin;
     private final File menusFolder;
-    private final Map<String, MenuDefinition> menuDefinitions = new HashMap<>();
+    // Remplacée d'un bloc par le reload : un menu déjà ouvert garde sa définition jusqu'à sa fermeture
+    private volatile Map<String, MenuDefinition> menuDefinitions = new HashMap<>();
 
     public MenuConfigManager(SHAuctions plugin) {
         this.plugin = plugin;
         this.menusFolder = new File(plugin.getDataFolder(), "menus");
     }
 
+    /** Lecture au démarrage : un menu illisible est ignoré (et jamais réécrit), les autres restent disponibles. */
     public void loadMenus() {
-        menuDefinitions.clear();
+        try {
+            this.menuDefinitions = readMenus(false);
+        } catch (ConfigLoadException e) {
+            // Inatteignable hors mode strict
+            plugin.getLogger().severe(e.getFile() + " : " + e.getMessage());
+        }
+        plugin.getLogger().info(menuDefinitions.size() + " menu definitions loaded.");
+    }
+
+    /** Lit tous les menus dans une table à part ; le premier fichier illisible interrompt la lecture. */
+    public Map<String, MenuDefinition> readMenusStrict() throws ConfigLoadException {
+        return readMenus(true);
+    }
+
+    /** Remplace les menus en mémoire par ceux que {@link #readMenusStrict()} a validés. */
+    public void apply(Map<String, MenuDefinition> loaded) {
+        this.menuDefinitions = loaded;
+        plugin.getLogger().info("Menu configurations reloaded (" + loaded.size() + ").");
+    }
+
+    private Map<String, MenuDefinition> readMenus(boolean strict) throws ConfigLoadException {
+        Map<String, MenuDefinition> loaded = new HashMap<>();
         if (!menusFolder.exists()) {
             if (menusFolder.mkdirs()) {
                 plugin.getLogger().info("Menus directory created at: " + menusFolder.getPath());
@@ -46,7 +71,7 @@ public class MenuConfigManager {
                 saveDefaultMenuIfNotExists("sales_history.yml");
             } else {
                 plugin.getLogger().severe("Could not create menus directory! GUIs may not work.");
-                return;
+                return loaded;
             }
         }
 
@@ -64,25 +89,38 @@ public class MenuConfigManager {
             menuFiles = menusFolder.listFiles((dir, name) -> name.toLowerCase().endsWith(".yml"));
             if (menuFiles == null || menuFiles.length == 0) {
                 plugin.getLogger().severe("Still no menu files after attempting to create defaults. GUIs will be unavailable.");
-                return;
+                return loaded;
             }
         }
 
         for (File menuFile : menuFiles) {
             String menuName = menuFile.getName().replace(".yml", "");
-            FileConfiguration menuConfig = YamlConfiguration.loadConfiguration(menuFile);
+            YamlConfiguration menuConfig = new YamlConfiguration();
+            try {
+                menuConfig.load(menuFile);
+            } catch (IOException | InvalidConfigurationException e) {
+                ConfigLoadException failure = new ConfigLoadException("menus/" + menuFile.getName(), e);
+                if (strict) {
+                    throw failure;
+                }
+                plugin.getLogger().severe(failure.getFile() + " illisible (" + failure.getMessage() + ") : menu ignoré, fichier non modifié.");
+                continue;
+            }
 
             try {
                 MenuDefinition definition = parseMenuDefinition(menuName, menuConfig, menuFile);
                 if (definition != null) {
-                    menuDefinitions.put(menuName, definition);
+                    loaded.put(menuName, definition);
                     plugin.getLogger().info("Loaded menu: " + menuName);
                 }
             } catch (Exception e) {
+                if (strict) {
+                    throw new ConfigLoadException("menus/" + menuFile.getName(), e);
+                }
                 plugin.getLogger().log(Level.SEVERE, "Error parsing menu file: " + menuFile.getName(), e);
             }
         }
-        plugin.getLogger().info(menuDefinitions.size() + " menu definitions loaded.");
+        return loaded;
     }
 
     private void saveDefaultMenuIfNotExists(String fileName) {
@@ -187,11 +225,5 @@ public class MenuConfigManager {
             plugin.getLogger().warning("Attempted to get non-existent menu definition: " + menuName);
         }
         return def;
-    }
-
-    public void reloadMenus() {
-        plugin.getLogger().info("Reloading menu configurations...");
-        loadMenus();
-        plugin.getLogger().info("Menu configurations reloaded.");
     }
 }

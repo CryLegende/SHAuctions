@@ -1,6 +1,8 @@
 package org.Cry_Legende.sHAuctions;
 
+import org.Cry_Legende.sHAuctions.command.AdminCommand;
 import org.Cry_Legende.sHAuctions.command.AuctionCommand;
+import org.Cry_Legende.sHAuctions.config.ConfigLoadException;
 import org.Cry_Legende.sHAuctions.config.ConfigManager;
 import org.Cry_Legende.sHAuctions.config.MenuConfigManager;
 import org.Cry_Legende.sHAuctions.config.MessageManager;
@@ -18,6 +20,7 @@ import org.Cry_Legende.sHAuctions.manager.AuctionManager;
 import org.Cry_Legende.sHAuctions.manager.ChatInputManager;
 import org.Cry_Legende.sHAuctions.manager.PermissionManager;
 import org.Cry_Legende.sHAuctions.manager.SharedFlows;
+import org.Cry_Legende.sHAuctions.model.MenuDefinition;
 import org.Cry_Legende.sHAuctions.network.NetBus;
 import org.Cry_Legende.sHAuctions.network.ShNetworkBus;
 import org.Cry_Legende.sHAuctions.task.ExpirationTask;
@@ -26,6 +29,8 @@ import org.Cry_Legende.sHAuctions.util.SerializationUtil;
 
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
+import org.bukkit.command.CommandSender;
+import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.InventoryHolder; // Pour la vérification générale
 import org.bukkit.plugin.PluginDescriptionFile;
@@ -33,6 +38,7 @@ import org.bukkit.plugin.PluginManager;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.File;
+import java.util.Map;
 import java.util.logging.Level;
 
 public class SHAuctions extends JavaPlugin {
@@ -143,6 +149,13 @@ public class SHAuctions extends JavaPlugin {
             getServer().getPluginManager().disablePlugin(this);
             return;
         }
+        if (getCommand("shauctions") != null) {
+            AdminCommand admin = new AdminCommand(this);
+            getCommand("shauctions").setExecutor(admin);
+            getCommand("shauctions").setTabCompleter(admin);
+        } else {
+            getLogger().severe("Command 'shauctions' is not defined in plugin.yml! Admin command will not be registered.");
+        }
         getLogger().info("Commands registered.");
 
         PluginManager pm = getServer().getPluginManager();
@@ -157,16 +170,7 @@ public class SHAuctions extends JavaPlugin {
         }
         getLogger().info("Listeners registered.");
 
-        expirationTask = new ExpirationTask(this);
-        long expirationCheckIntervalTicks = configManager.getLong("tasks.expiration_check_interval_seconds", 300) * 20L;
-        if (expirationCheckIntervalTicks <= 0) {
-            getLogger().warning("Expiration check interval is zero or negative. ExpirationTask will not run.");
-        } else {
-            // Thread principal, comme l'achat et l'annulation : ces trois opérations ne peuvent plus
-            // s'entrelacer sur la même enchère (sinon item acheté ET renvoyé en invendus).
-            expirationTask.runTaskTimer(this, 20L * 60, expirationCheckIntervalTicks);
-            getLogger().info("ExpirationTask started (Interval: " + (expirationCheckIntervalTicks / 20) + "s).");
-        }
+        scheduleExpirationTask();
 
         realTimeLoreUpdateTask = new RealTimeLoreUpdateTask(this);
         // Rafraîchissement du lore toutes les 2s (40 ticks) : le temps restant en secondes reste
@@ -190,8 +194,9 @@ public class SHAuctions extends JavaPlugin {
         getLogger().info("------------------------------------");
         getLogger().info(ChatColor.RED + pdf.getName() + " disabling...");
 
-        if (expirationTask != null && !expirationTask.isCancelled()) {
+        if (expirationTask != null) {
             expirationTask.cancel();
+            expirationTask = null;
             getLogger().info("ExpirationTask cancelled.");
         }
         if (sharedFlows != null) {
@@ -227,6 +232,63 @@ public class SHAuctions extends JavaPlugin {
         getLogger().info(ChatColor.RED + pdf.getName() + " has been disabled.");
         getLogger().info("------------------------------------");
         instance = null;
+    }
+
+    /**
+     * Lance (ou relance) la tâche des échéances avec l'intervalle courant de {@code tasks.expiration_check_interval_seconds}.
+     * Thread principal, comme l'achat et l'annulation : ces trois opérations ne peuvent plus s'entrelacer sur la même
+     * enchère (sinon item acheté ET renvoyé en invendus).
+     */
+    private void scheduleExpirationTask() {
+        if (expirationTask != null) {
+            expirationTask.cancel();
+            expirationTask = null;
+        }
+        long intervalTicks = configManager.getLong("tasks.expiration_check_interval_seconds", 300) * 20L;
+        if (intervalTicks <= 0) {
+            getLogger().warning("Expiration check interval is zero or negative. ExpirationTask will not run.");
+            return;
+        }
+        expirationTask = new ExpirationTask(this);
+        expirationTask.runTaskTimer(this, 20L * 60, intervalTicks);
+        getLogger().info("ExpirationTask started (Interval: " + (intervalTicks / 20) + "s).");
+    }
+
+    /**
+     * Recharge config.yml, messages.yml et les menus. Chaque fichier est lu dans un objet à part : au premier fichier
+     * illisible rien n'est remplacé et l'expéditeur reçoit le nom du fichier et l'erreur. Les données (base, ventes,
+     * invendus, recherches) ne sont jamais touchées.
+     *
+     * @return vrai si tout a été rechargé
+     */
+    public boolean reloadAll(CommandSender sender) {
+        long start = System.currentTimeMillis();
+        YamlConfiguration newConfig;
+        YamlConfiguration newMessages;
+        Map<String, MenuDefinition> newMenus;
+        try {
+            newConfig = configManager.read();
+            newMessages = messageManager.read();
+            newMenus = menuConfigManager.readMenusStrict();
+        } catch (ConfigLoadException e) {
+            getLogger().severe("Reload annulé : " + e.getFile() + " illisible (" + e.getMessage() + "). Configuration précédente conservée.");
+            messageManager.sendMessage(sender, "reload_file_error",
+                Map.of("file", e.getFile(), "error", e.getMessage()));
+            return false;
+        } catch (RuntimeException e) {
+            getLogger().log(Level.SEVERE, "Reload annulé : erreur inattendue. Configuration précédente conservée.", e);
+            messageManager.sendMessage(sender, "reload_failure");
+            return false;
+        }
+        configManager.apply(newConfig);
+        messageManager.apply(newMessages);
+        menuConfigManager.apply(newMenus);
+        scheduleExpirationTask();
+        long duration = System.currentTimeMillis() - start;
+        messageManager.sendMessage(sender, "reload_success", Map.of("duration", String.valueOf(duration)));
+        messageManager.sendMessage(sender, "reload_restart_note");
+        getLogger().info("Configuration reloaded by " + sender.getName() + " in " + duration + "ms.");
+        return true;
     }
 
     /** Mode réseau voulu : SHNetwork chargé et {@code reseau.actif} vrai (par défaut). */

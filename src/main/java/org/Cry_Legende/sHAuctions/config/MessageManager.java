@@ -3,6 +3,7 @@ package org.Cry_Legende.sHAuctions.config;
 import org.Cry_Legende.sHAuctions.SHAuctions;
 import org.bukkit.ChatColor;
 import org.bukkit.command.CommandSender;
+import org.bukkit.configuration.InvalidConfigurationException;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
@@ -22,9 +23,10 @@ import java.util.regex.Pattern;
 public class MessageManager {
 
     private final SHAuctions plugin;
-    private FileConfiguration messagesConfig;
-    private File messagesFile;
-    private String prefix;
+    // Remplacés d'un bloc par le reload : les commandes et les menus gardent la référence du MessageManager
+    private volatile FileConfiguration messagesConfig = new YamlConfiguration();
+    private final File messagesFile;
+    private volatile String prefix = "";
 
     // Pour les placeholders spécifiques aux messages (non ceux des items de GUI)
     private final Pattern placeholderPattern = Pattern.compile("%([^%]+)%");
@@ -38,40 +40,59 @@ public class MessageManager {
         this.messagesFile = new File(plugin.getDataFolder(), "messages.yml");
     }
 
+    /**
+     * Lecture au démarrage. Un fichier illisible n'est jamais réécrit : les messages du jar servent le temps que le
+     * fichier soit corrigé.
+     */
     public void loadMessages() {
+        try {
+            YamlConfiguration loaded = read();
+            loaded.options().copyDefaults(true);
+            try {
+                loaded.save(messagesFile);
+            } catch (IOException e) {
+                plugin.getLogger().log(Level.SEVERE, "Could not save messages.yml after adding defaults", e);
+            }
+            apply(loaded);
+            plugin.getLogger().info("messages.yml loaded successfully.");
+        } catch (ConfigLoadException e) {
+            plugin.getLogger().severe("messages.yml illisible (" + e.getMessage() + ") : messages du jar utilisés, fichier non modifié.");
+            YamlConfiguration fallback = new YamlConfiguration();
+            attachDefaults(fallback);
+            apply(fallback);
+        }
+    }
+
+    /** Lit messages.yml dans un objet à part, avec les valeurs du jar pour toute clé absente. Ne modifie rien. */
+    public YamlConfiguration read() throws ConfigLoadException {
         if (!messagesFile.exists()) {
             plugin.saveResource("messages.yml", false);
             plugin.getLogger().info("messages.yml not found, created a default one.");
         }
-        messagesConfig = YamlConfiguration.loadConfiguration(messagesFile);
-
-        InputStream defaultMessagesStream = plugin.getResource("messages.yml");
-        if (defaultMessagesStream != null) {
-            YamlConfiguration defaultMessages = YamlConfiguration.loadConfiguration(new InputStreamReader(defaultMessagesStream, StandardCharsets.UTF_8));
-            messagesConfig.setDefaults(defaultMessages);
-            messagesConfig.options().copyDefaults(true);
-            try {
-                messagesConfig.save(messagesFile);
-            } catch (IOException e) {
-                plugin.getLogger().log(Level.SEVERE, "Could not save messages.yml after adding defaults", e);
-            }
+        YamlConfiguration loaded = new YamlConfiguration();
+        try {
+            loaded.load(messagesFile);
+        } catch (IOException | InvalidConfigurationException e) {
+            throw new ConfigLoadException("messages.yml", e);
         }
-        this.prefix = translateColors(messagesConfig.getString("plugin_prefix", "&8[&6SHAuctions&8] &r"));
-        plugin.getLogger().info("messages.yml loaded successfully.");
+        attachDefaults(loaded);
+        return loaded;
     }
 
-    public void reloadMessages() {
-        if (!messagesFile.exists()) {
-            plugin.saveResource("messages.yml", false);
+    /** Remplace les messages en mémoire par ceux que {@link #read()} a validés. */
+    public void apply(YamlConfiguration loaded) {
+        this.messagesConfig = loaded;
+        this.prefix = translateColors(loaded.getString("plugin_prefix", "&8[&6SHAuctions&8] &r"));
+    }
+
+    private void attachDefaults(YamlConfiguration target) {
+        try (InputStream in = plugin.getResource("messages.yml")) {
+            if (in != null) {
+                target.setDefaults(YamlConfiguration.loadConfiguration(new InputStreamReader(in, StandardCharsets.UTF_8)));
+            }
+        } catch (IOException e) {
+            plugin.getLogger().log(Level.WARNING, "messages.yml de référence illisible", e);
         }
-        messagesConfig = YamlConfiguration.loadConfiguration(messagesFile);
-        InputStream defaultMessagesStream = plugin.getResource("messages.yml");
-        if (defaultMessagesStream != null) {
-            YamlConfiguration defaultMessages = YamlConfiguration.loadConfiguration(new InputStreamReader(defaultMessagesStream, StandardCharsets.UTF_8));
-            messagesConfig.setDefaults(defaultMessages);
-        }
-        this.prefix = translateColors(messagesConfig.getString("plugin_prefix", "&8[&6SHAuctions&8] &r"));
-        plugin.getLogger().info("messages.yml reloaded.");
     }
 
     public String getMessage(String key) {

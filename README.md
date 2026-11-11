@@ -47,7 +47,11 @@ Avec **SHNetwork** chargé et `reseau.actif: true` (par défaut), un seul hôtel
 
 | Commande | Alias | Description | Permission |
 |---|---|---|---|
-| `/hdv` | `/ah`, `/auctionhouse` | Ouvre l'hôtel des ventes ou gère les enchères. | — |
+| `/hdv` | `/ah`, `/auctionhouse` | Ouvre l'hôtel des ventes. Sous-commandes joueur : `sell`, `bid`, `history`, `expired`, `ownsales`, `recherche`. | `shauctions.use` |
+| `/shauctions reload` | — | Recharge `config.yml`, `messages.yml` et les menus. Un fichier illisible ne change rien : le message donne le fichier et l'erreur. Replanifie la tâche des échéances. Les sections `reseau`, `database` et `economy.use_vault` demandent un redémarrage ; les données ne sont jamais touchées. | `shauctions.admin.reload` |
+| `/shauctions info <joueur>` | — | Ventes, enchères, invendus et ventes terminées d'un joueur, avec ses limites s'il est connecté. | `shauctions.admin.info` |
+
+`/shauctions` marche aussi depuis la console. `/hdv reload` reste accepté et fait la même chose que `/shauctions reload`. Sans argument, `/shauctions` rappelle les sous-commandes que l'on a le droit d'utiliser.
 
 ## Permissions
 
@@ -66,7 +70,20 @@ Avec **SHNetwork** chargé et `reseau.actif: true` (par défaut), un seul hôtel
 | `shauctions.expired.claim` | Permet de réclamer ses items expirés. | `true` |
 | `shauctions.cancel.self` | Permet d'annuler ses propres ventes. | `true` |
 | `shauctions.cancel.others` | Permet d'annuler les ventes des autres joueurs (admin). | `op` |
-| `shauctions.reload` | Permet de recharger la configuration du plugin. | `op` |
+| `shauctions.ownsales.view` | Permet d'utiliser la commande `/hdv ownsales` (le bouton des menus passe par `shauctions.menu.ownsales`). | `op` |
+| `shauctions.recherches.use` | Onglet Recherches de l'HDV. | `true` |
+| `shauctions.recherches.admin` | Supprimer n'importe quelle recherche, sans délai entre deux publications. | `op` |
+| `shauctions.admin` | Toute l'administration (parent des deux permissions suivantes). | `op` |
+| `shauctions.admin.reload` | `/shauctions reload` et `/hdv reload`. | `op` |
+| `shauctions.admin.info` | `/shauctions info`. | `op` |
+
+Paliers (nœuds construits à partir d'un nombre, non déclarés) :
+
+| Permission | Effet |
+|---|---|
+| `shauctions.limit.<n>` (ou `unlimited`, `*`) | Ventes simultanées, exemple `shauctions.limit.4`. La plus grande valeur l'emporte. |
+| `shauctions.bidlimit.<n>` (ou `unlimited`, `*`) | Enchères simultanées, exemple `shauctions.bidlimit.1`. |
+| `shauctions.recherches.max.<n>` | Recherches en cours, exemple `shauctions.recherches.max.6`. |
 
 ## Configuration
 

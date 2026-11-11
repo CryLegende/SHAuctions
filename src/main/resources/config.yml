@@ -16,11 +16,20 @@
 #                                ou ignore la proposition.
 #   /hdv recherche [mes|nouvelle|<texte>]
 #                                Recherches des joueurs : voir, publier les siennes.
-#   /hdv reload                  Recharge config.yml, messages.yml et les menus.
 #   (Mise sur une enchère : clic gauche sur l'item dans la page Enchères, puis montant saisi dans
 #    un dialogue (clients 1.21.6+, voir « dialogues » plus bas) ou, pour les clients plus anciens, dans le chat.
 #    Annulation staff : clic droit sur l'item dans le GUI, puis raison saisie de la même façon.
 #    Aucun identifiant d'enchère n'est jamais exposé aux joueurs ni au staff.)
+#
+#  ADMINISTRATION  (racine /shauctions, console comprise ; pas d'alias)
+#  ----------------------------------------------------------------------------
+#   /shauctions reload           Recharge config.yml, messages.yml et les 8 menus/*.yml. Un fichier illisible
+#                                ne change rien : le message donne le fichier et l'erreur. Replanifie la tâche des
+#                                échéances. Les sections reseau, database et economy.use_vault demandent un
+#                                redémarrage. Les données (ventes, invendus, historique, recherches) ne sont
+#                                jamais touchées. (/hdv reload reste accepté.)
+#   /shauctions info <joueur>    Ventes, enchères, invendus et ventes terminées d'un joueur, avec ses limites
+#                                s'il est connecté.
 #
 #  PERMISSIONS
 #  ----------------------------------------------------------------------------
@@ -37,9 +46,12 @@
 #   shauctions.expired.claim    Réclamer ses items expirés.             [true]
 #   shauctions.cancel.self      Annuler ses propres ventes.             [true]
 #   shauctions.cancel.others    Annuler les ventes des autres (staff).  [op]
-#   shauctions.reload           Recharger la configuration.             [op]
+#   shauctions.ownsales.view    /hdv ownsales (la commande, pas le bouton). [op]
 #   shauctions.recherches.use   Onglet Recherches de l'HDV.             [true]
 #   shauctions.recherches.admin Supprimer toute recherche, sans délai.  [op]
+#   shauctions.admin            Parent de toute l'administration :       [op]
+#     shauctions.admin.reload     /shauctions reload (et /hdv reload)    [op]
+#     shauctions.admin.info       /shauctions info                       [op]
 #
 #   Limites NUMÉRIQUES (la valeur la plus élevée l'emporte ; sinon la valeur
 #   par défaut de config.yml est utilisée) :
@@ -50,7 +62,7 @@
 #                               avec shauctions.limit.3 (3 ventes) et aucune perm
 #                               bidlimit garde le défaut d'enchères ci-dessous (1).
 #   shauctions.bidlimit.unlimited  (ou shauctions.bidlimit.*)  Enchères illimitées.
-#   shauctions.recherches.max.<N>  Nb max de recherches en cours (N = 1..20).
+#   shauctions.recherches.max.<N>  Nb max de recherches en cours (N = 1..20, au-dessus de recherches.max-par-joueur).
 #
 #  PLACEHOLDERS
 #  ----------------------------------------------------------------------------

@@ -5,6 +5,7 @@ import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
 import org.bukkit.Registry;
 import org.bukkit.Sound;
+import org.bukkit.configuration.InvalidConfigurationException;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 
@@ -22,46 +23,69 @@ import java.util.logging.Level;
 public class ConfigManager {
 
     private final SHAuctions plugin;
-    private FileConfiguration config;
-    private File configFile;
+    // Remplacé d'un bloc par le reload : les menus et les tâches gardent la référence du ConfigManager, pas de la config
+    private volatile FileConfiguration config;
+    private final File configFile;
 
     public ConfigManager(SHAuctions plugin) {
         this.plugin = plugin;
         this.configFile = new File(plugin.getDataFolder(), "config.yml");
+        this.config = new YamlConfiguration();
     }
 
+    /**
+     * Lecture au démarrage. Un fichier illisible n'est jamais réécrit : le plugin tourne sur les valeurs du jar le
+     * temps que le fichier soit corrigé.
+     */
     public void load() {
+        try {
+            YamlConfiguration loaded = read();
+            loaded.options().copyDefaults(true);
+            try {
+                loaded.save(configFile);
+            } catch (IOException e) {
+                plugin.getLogger().log(Level.SEVERE, "Could not save config.yml after adding defaults", e);
+            }
+            config = loaded;
+            plugin.getLogger().info("config.yml loaded successfully.");
+        } catch (ConfigLoadException e) {
+            plugin.getLogger().severe("config.yml illisible (" + e.getMessage() + ") : valeurs du jar utilisées, fichier non modifié.");
+            YamlConfiguration fallback = new YamlConfiguration();
+            attachDefaults(fallback);
+            config = fallback;
+        }
+    }
+
+    /** Lit config.yml dans un objet à part, avec les valeurs du jar pour toute clé absente. Ne modifie rien. */
+    public YamlConfiguration read() throws ConfigLoadException {
         if (!configFile.exists()) {
             plugin.saveResource("config.yml", false);
             plugin.getLogger().info("config.yml not found, created a default one.");
         }
-        config = YamlConfiguration.loadConfiguration(configFile);
-
-        InputStream defaultConfigStream = plugin.getResource("config.yml");
-        if (defaultConfigStream != null) {
-            YamlConfiguration defaultConfig = YamlConfiguration.loadConfiguration(new InputStreamReader(defaultConfigStream, StandardCharsets.UTF_8));
-            config.setDefaults(defaultConfig);
-            config.options().copyDefaults(true);
-            try {
-                config.save(configFile);
-            } catch (IOException e) {
-                plugin.getLogger().log(Level.SEVERE, "Could not save config.yml after adding defaults", e);
-            }
+        YamlConfiguration loaded = new YamlConfiguration();
+        try {
+            loaded.load(configFile);
+        } catch (IOException | InvalidConfigurationException e) {
+            throw new ConfigLoadException("config.yml", e);
         }
-        plugin.getLogger().info("config.yml loaded successfully.");
+        attachDefaults(loaded);
+        return loaded;
     }
 
-    public void reload() {
-        if (!configFile.exists()) {
-            plugin.saveResource("config.yml", false);
-        }
-        config = YamlConfiguration.loadConfiguration(configFile);
-        InputStream defaultConfigStream = plugin.getResource("config.yml");
-        if (defaultConfigStream != null) {
-            YamlConfiguration defaultConfig = YamlConfiguration.loadConfiguration(new InputStreamReader(defaultConfigStream, StandardCharsets.UTF_8));
-            config.setDefaults(defaultConfig);
-        }
+    /** Remplace la configuration en mémoire par celle que {@link #read()} a validée. */
+    public void apply(YamlConfiguration loaded) {
+        this.config = loaded;
         plugin.getLogger().info("config.yml reloaded.");
+    }
+
+    private void attachDefaults(YamlConfiguration target) {
+        try (InputStream in = plugin.getResource("config.yml")) {
+            if (in != null) {
+                target.setDefaults(YamlConfiguration.loadConfiguration(new InputStreamReader(in, StandardCharsets.UTF_8)));
+            }
+        } catch (IOException e) {
+            plugin.getLogger().log(Level.WARNING, "config.yml de référence illisible", e);
+        }
     }
 
     public String getString(String path) {

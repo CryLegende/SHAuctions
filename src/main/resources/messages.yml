@@ -10,8 +10,22 @@ plugin_prefix: '' # Laissé vide car le préfixe est ajouté à chaque message i
 reload_success: '&7&l« &a&lSH &8&l» &7Configuration rechargée &aavec succès&7.'
 reload_failure: '&7&l« &c&lSH &8&l» &7Erreur lors du rechargement de la configuration.
   &cVérifiez la console&7.'
+reload_file_error: '&7&l« &c&lSH &8&l» &cRechargement annulé&7 : &c%file% &7est illisible &8(&7%error%&8)&7.
+  L''ancienne configuration reste en place.'
+reload_restart_note: '&7&l« &e&lSH &8&l» &7Les sections &ereseau&7, &edatabase&7 et &eeconomy.use_vault&7 de config.yml
+  demandent un &eredémarrage&7.'
 no_permission: '&7&l« &c&lSH &8&l» &7Vous n''avez pas la permission d''exécuter cette
   commande.'
+hdv_usage: '&7&l« &e&lSH &8&l» &7Utilisation : &e/hdv <%commands%>&7.'
+admin_usage: '&7&l« &e&lSH &8&l» &7Utilisation : &e/shauctions <%commands%>&7.'
+info_usage: '&7&l« &c&lSH &8&l» &7Utilisation : &e/shauctions info <joueur>&7.'
+info_unknown_player: '&7&l« &c&lSH &8&l» &7Joueur &c%player% &7inconnu : il n''est pas connecté
+  et ce serveur ne le connaît pas.'
+info_header: '&7&l« &e&lSH &8&l» &7Hôtel des ventes de &e%player% &7:'
+info_sales: ' &8• &7Ventes en cours : &e%count% &8/ &7%limit%'
+info_bids: ' &8• &7Enchères en cours : &e%count% &8/ &7%limit%'
+info_expired: ' &8• &7Invendus à récupérer : &e%count%'
+info_sold: ' &8• &7Ventes terminées : &e%count%'
 player_only_command: '&7&l« &c&lSH &8&l» &7Cette commande ne peut être exécutée que
   par un joueur.'
 generic_error_occurred: '&7&l« &c&lSH &8&l» &7Une erreur est survenue (&c%error_details%&7).
@@ -66,9 +80,6 @@ must_hold_item: '&7&l« &c&lSH &8&l» &7Vous devez tenir l''item que vous souhai
 no_item_in_hand: '&7&l« &c&lSH &8&l» &7Vous ne tenez aucun item dans votre main.'
 sell_usage: '&7&l« &b&lSH &8&l» &7Usage: &b/hdv sell <prix> [durée] &7(ex: &b1h30m
   &7ou &b12 &7= 12h)'
-sell_confirmation: '&7&l« &e&lSH &8&l» &7Vous allez mettre en vente &e%item_name%
-  &7x&e%amount% &7pour &e%price% &7pendant &e%duration%&7. Confirmez avec &b/hdv confirm&7
-  ou annulez avec &b/hdv cancel sell&7.'
 item_listed_successfully: '&7&l« &a&lSH &8&l» &7Votre item &a%item_name% &7a été mis
   en vente pour &a%price% &7pendant &a%duration%&7.'
 

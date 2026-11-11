@@ -128,17 +128,19 @@ public class AuctionCommand implements CommandExecutor, TabCompleter {
         return Collections.emptyList();
     }
 
+    /** Une ligne d'usage, limitée aux sous-commandes que l'expéditeur peut utiliser (les cachées n'y figurent pas). */
     private void sendHelpMessage(CommandSender sender) {
-        // Construire un message d'aide listant les sous-commandes disponibles
-        messageManager.sendMessageNoPrefix(sender, "&6--- SHAuctions Help ---");
-        subCommands.values().stream()
+        List<String> names = subCommands.values().stream()
             .distinct()
             .filter(sc -> !sc.isHidden())
             .filter(sc -> sender.hasPermission(sc.getPermission()))
-            .forEach(sc -> {
-                String usage = sc.getUsage().isEmpty() ? "" : " " + sc.getUsage();
-                messageManager.sendMessageNoPrefix(sender, "&e/hdv " + sc.getName() + usage + " &7- " + sc.getDescription());
-            });
-        messageManager.sendMessageNoPrefix(sender, "&6---------------------");
+            .map(SubCommand::getName)
+            .sorted()
+            .collect(Collectors.toList());
+        if (names.isEmpty()) {
+            messageManager.sendMessage(sender, "no_permission");
+            return;
+        }
+        messageManager.sendMessage(sender, "hdv_usage", Collections.singletonMap("commands", String.join("|", names)));
     }
 }

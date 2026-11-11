@@ -13,9 +13,12 @@ libraries:
 commands:
   hdv: # Ou 'ah', 'auction', etc.
     description: Ouvre l'hôtel des ventes ou gère les enchères.
-    usage: "/hdv [sell <prix>|history|expired|reload|...]"
+    usage: "/hdv [sell|bid|history|expired|ownsales|recherche]"
     aliases: [ah, auctionhouse]
-  # On pourrait aussi définir les sous-commandes ici, mais c'est souvent mieux géré en interne
+  shauctions:
+    description: Administration de SHAuctions (reload, info).
+    usage: /shauctions <reload|info>
+    permission: shauctions.admin.reload;shauctions.admin.info
 
 permissions:
   shauctions.use:
@@ -57,8 +60,20 @@ permissions:
   shauctions.cancel.others:
     description: Permet d'annuler les ventes des autres joueurs (admin).
     default: op
-  shauctions.reload:
-    description: Permet de recharger la configuration du plugin.
+  shauctions.ownsales.view:
+    description: Permet d'utiliser la commande /hdv ownsales (le bouton des menus passe par shauctions.menu.ownsales).
+    default: op
+  shauctions.admin:
+    description: Toute l'administration de SHAuctions.
+    default: op
+    children:
+      shauctions.admin.reload: true
+      shauctions.admin.info: true
+  shauctions.admin.reload:
+    description: Recharger config.yml, messages.yml et les menus (/shauctions reload).
+    default: op
+  shauctions.admin.info:
+    description: Voir les ventes, enchères et invendus d'un joueur (/shauctions info).
     default: op
   shauctions.recherches.use:
     description: Onglet Recherches de l'HDV (voir, publier, contacter, supprimer les siennes).
@@ -66,3 +81,7 @@ permissions:
   shauctions.recherches.admin:
     description: Supprimer n'importe quelle recherche, sans délai entre deux publications.
     default: op
+  # Paliers (nœuds construits à partir d'un nombre, non déclarés) :
+  #   shauctions.limit.<n> (ou unlimited, *)     ventes simultanées, exemple shauctions.limit.4
+  #   shauctions.bidlimit.<n> (ou unlimited, *)  enchères simultanées, exemple shauctions.bidlimit.1
+  #   shauctions.recherches.max.<n>              recherches en cours, exemple shauctions.recherches.max.6
