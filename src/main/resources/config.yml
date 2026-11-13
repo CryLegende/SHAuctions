@@ -107,7 +107,7 @@ reseau:
   # y est reprise une fois pour tout le réseau ; chaque serveur renomme ensuite la sienne en <fichier>.avant-reseau.
   # Si cette base est injoignable, l'HDV se désactive sur ce serveur (jamais de retour à la base SQLite locale).
   base-de-donnees:
-    url: "jdbc:mariadb://127.0.0.1:3306/bo_net"
+    url: "jdbc:mariadb://127.0.0.1:3306/minecraft"
     utilisateur: shauctions
     mot-de-passe: CHANGE_ME
     # Délai maximal de connexion et de réponse de la base, en millisecondes
@@ -119,9 +119,9 @@ economy:
   # Si false, certaines fonctionnalités (achat/vente) pourraient être désactivées ou fonctionner différemment.
   use_vault: true
   # Nom de la monnaie (utilisé dans les messages, etc.)
-  currency_symbol: SHC # Vous pouvez utiliser des codes couleurs comme "&2$"
-  currency_name_singular: SHCoin
-  currency_name_plural: SHCoins
+  currency_symbol: $ # Vous pouvez utiliser des codes couleurs comme "&2$"
+  currency_name_singular: Pièce
+  currency_name_plural: Pièces
   # Seuil (montant) à partir duquel les messages (chat) ajoutent une forme abrégée entre parenthèses.
   # Ex: "1,000,000,000 SHC (1 Md)". Voir aussi formatting.abbreviate_* pour les menus.
   detailed_format_threshold: 1000000
@@ -129,9 +129,9 @@ economy:
 # Limites des enchères
 auction_limits:
   # Prix minimum pour mettre un item en vente
-  min_price: 500.0
+  min_price: 100.0
   # Prix maximum pour mettre un item en vente (0 pour illimité)
-  max_price: 1000000000
+  max_price: 1000000
   # Durée par défaut d'une enchère en secondes (ex: 86400 = 24 heures)
   default_duration_seconds: 86400
   # Durée minimale d'une enchère en secondes
@@ -148,11 +148,11 @@ auction_limits:
 # Enchères (type BID) — page "Enchères" du menu
 bids:
   # Prix de départ minimum d'une enchère (défaut : auction_limits.min_price si absent)
-  min_starting_price: 500.0
+  min_starting_price: 100.0
   # Prix de départ maximum d'une enchère, 0 pour illimité (défaut : auction_limits.max_price si absent)
-  max_starting_price: 1000000000
+  max_starting_price: 1000000
   # Incrément minimal entre deux mises successives
-  min_bid_increment: 100.0
+  min_bid_increment: 10.0
   # Durée par défaut d'une enchère en secondes (utilisée si aucune durée n'est précisée dans /hdv bid)
   default_duration_seconds: 86400
   # Nombre maximum d'enchères (type BID) qu'un joueur peut avoir simultanément.
@@ -186,7 +186,7 @@ bids:
 encheres-serveur:
   actif: false
   # Nom du vendeur affiché dans l'HDV et dans les annonces
-  vendeur: SkyHand
+  vendeur: Serveur
   # Nombre d'enchères par jour, tiré entre min et max chaque jour (le jour de la mise en route, au prorata de la plage restante)
   par-jour:
     min: 2
@@ -270,7 +270,7 @@ encheres-serveur:
 ventes-serveur:
   actif: false
   # Nom du vendeur affiché dans l'HDV et dans les annonces
-  vendeur: SkyHand
+  vendeur: Serveur
   # Nombre de ventes par jour, tiré entre min et max chaque jour (le jour de la mise en route, au prorata de la plage restante)
   par-jour:
     min: 2
@@ -488,32 +488,32 @@ logs:
   # Variables : %player%, %amount%, %item%, %price%, %duration%.
   mises-en-vente:
     file: "mises-en-vente"
-    format: "%player% -> met en vente %amount% x %item% (%price% SHCoins, durée %duration%)"
+    format: "%player% -> met en vente %amount% x %item% (%price% pièces, durée %duration%)"
   # Mise aux enchères.
   # Variables : %player%, %amount%, %item%, %price% (prix de départ), %duration%.
   mises-aux-encheres:
     file: "mises-en-vente"
-    format: "%player% -> met aux enchères %amount% x %item% (départ %price% SHCoins, durée %duration%)"
+    format: "%player% -> met aux enchères %amount% x %item% (départ %price% pièces, durée %duration%)"
   # Achat d'une vente directe.
   # Variables : %buyer%, %seller%, %amount%, %item%, %price%.
   achats:
     file: "achats"
-    format: "%buyer% -> achète %amount% x %item% à %seller% (%price% SHCoins)"
+    format: "%buyer% -> achète %amount% x %item% à %seller% (%price% pièces)"
   # Enchère terminée avec un gagnant (enchères du serveur comprises, vendeur = encheres-serveur.vendeur).
   # Variables : %winner%, %seller%, %amount%, %item%, %price% (montant final).
   encheres:
     file: "encheres"
-    format: "%winner% -> remporte %amount% x %item% de %seller% (%price% SHCoins)"
+    format: "%winner% -> remporte %amount% x %item% de %seller% (%price% pièces)"
   # Mise acceptée sur une enchère.
   # Variables : %player%, %seller%, %amount%, %item%, %price% (montant misé).
   mises:
     file: "encheres"
-    format: "%player% -> mise %price% SHCoins sur %amount% x %item% de %seller%"
+    format: "%player% -> mise %price% pièces sur %amount% x %item% de %seller%"
   # Enchère du serveur mise en ligne.
   # Variables : %lot%, %item% (avec la quantité), %price% (départ), %duration%.
   encheres-serveur-lancement:
     file: "encheres-serveur"
-    format: "%lot% -> mis aux enchères par le serveur : %item% (départ %price% SHCoins, durée %duration%)"
+    format: "%lot% -> mis aux enchères par le serveur : %item% (départ %price% pièces, durée %duration%)"
   # Lot remis au gagnant (commandes lancées), tout de suite ou quand il le récupère dans ses invendus.
   # Variables : %player%, %lot%, %item%.
   encheres-serveur-livraison:
@@ -523,12 +523,12 @@ logs:
   # Variables : %item%, %price% (départ).
   encheres-serveur-sans-offre:
     file: "encheres-serveur"
-    format: "%item% -> enchère du serveur terminée sans offre (départ %price% SHCoins)"
+    format: "%item% -> enchère du serveur terminée sans offre (départ %price% pièces)"
   # Vente du serveur mise en ligne.
   # Variables : %lot%, %item% (avec la quantité), %price%, %duration%.
   ventes-serveur-mise-en-vente:
     file: "ventes-serveur"
-    format: "%lot% -> mis en vente par le serveur : %item% (%price% SHCoins, durée %duration%)"
+    format: "%lot% -> mis en vente par le serveur : %item% (%price% pièces, durée %duration%)"
   # Lot d'une vente du serveur remis à l'acheteur (commandes lancées), tout de suite ou quand il le récupère.
   # Variables : %player%, %lot%, %item%.
   ventes-serveur-livraison:
@@ -538,7 +538,7 @@ logs:
   # Variables : %item%, %price%.
   ventes-serveur-invendue:
     file: "ventes-serveur"
-    format: "%item% -> vente du serveur terminée sans acheteur (%price% SHCoins)"
+    format: "%item% -> vente du serveur terminée sans acheteur (%price% pièces)"
   # Annonce retirée par son vendeur.
   # Variables : %player%, %amount%, %item%.
   retraits:
