@@ -215,51 +215,39 @@ encheres-serveur:
   #                   brillant (reflet d'enchantement), texture (base64, pour une PLAYER_HEAD)
   #   commandes       lancées par la console pour le gagnant, %player% = son pseudo
   lots:
-    - id: entonnoir
-      poids: 8
-      prix-depart: 5000000
-      increment-min: 250000
+    - id: balise
+      poids: 3
+      prix-depart: 50000
+      increment-min: 2500
       objet:
-        materiau: HOPPER
+        materiau: BEACON
         quantite: 1
-        nom: "&6Entonnoir"
+        nom: "&bBalise"
       commandes:
-        - "minecraft:give %player% hopper 1"
-    - id: cle-rare
-      poids: 6
-      prix-depart: 700000
-      increment-min: 35000
-      objet:
-        materiau: TRIPWIRE_HOOK
-        quantite: 1
-        nom: "&bClé Rare"
-        brillant: true
-      commandes:
-        - shcrates givekey %player% rare 1 physical
-    - id: livre-planteur-verrues-3
-      poids: 4
-      prix-depart: 2500000
-      increment-min: 120000
+        - "minecraft:give %player% beacon 1"
+    - id: livre-raccommodage
+      poids: 2
+      prix-depart: 20000
+      increment-min: 1000
       objet:
         materiau: ENCHANTED_BOOK
         quantite: 1
-        nom: "&5Planteur de Verrues III"
+        nom: "&bLivre &fRaccommodage"
         description:
-          - "&7Réussite garantie : &a100 %"
+          - "&7Répare l'objet avec l'expérience"
         brillant: true
       commandes:
-        - shenchants give book %player% wartplanteur 3 100
-    - id: cle-ordinaire
-      poids: 3
-      prix-depart: 90000
-      increment-min: 5000
+        - "minecraft:give %player% enchanted_book[stored_enchantments={\"minecraft:mending\":1}] 1"
+    - id: diamants-x16
+      poids: 5
+      prix-depart: 10000
+      increment-min: 500
       objet:
-        materiau: TRIPWIRE_HOOK
-        quantite: 1
-        nom: "&eClé Ordinaire"
-        brillant: true
+        materiau: DIAMOND
+        quantite: 16
+        nom: "&bDiamant"
       commandes:
-        - shcrates givekey %player% ordinaire 1 physical
+        - "minecraft:give %player% diamond 16"
 
 # Ventes du serveur : chaque jour, le serveur met aussi quelques lots en vente à prix fixe dans la page Ventes, vendeur
 # affiché « vendeur ». Un seul exemplaire par vente : il disparaît une fois acheté ou à la fin de sa durée. Le prix
@@ -298,68 +286,34 @@ ventes-serveur:
   #                   brillant (reflet d'enchantement), texture (base64, pour une PLAYER_HEAD)
   #   commandes       lancées par la console pour l'acheteur, %player% = son pseudo
   lots:
-    - id: cle-ordinaire
-      poids: 10
-      prix: 150000
-      objet:
-        materiau: TRIPWIRE_HOOK
-        quantite: 1
-        nom: "&eClé Ordinaire"
-        brillant: true
-      commandes:
-        - shcrates givekey %player% ordinaire 1 physical
-    - id: cle-rare
-      poids: 6
-      prix: 1200000
-      objet:
-        materiau: TRIPWIRE_HOOK
-        quantite: 1
-        nom: "&bClé Rare"
-        brillant: true
-      commandes:
-        - shcrates givekey %player% rare 1 physical
-    - id: fiole-xp-10000
+    - id: emeraudes-x32
       poids: 5
-      prix: 650000
+      prix: 8000
+      objet:
+        materiau: EMERALD
+        quantite: 32
+        nom: "&aÉmeraude"
+      commandes:
+        - "minecraft:give %player% emerald 32"
+    - id: xp-30-niveaux
+      poids: 3
+      prix: 15000
       objet:
         materiau: EXPERIENCE_BOTTLE
         quantite: 1
-        nom: "&aBouteille de 10 000 XP"
+        nom: "&a30 niveaux d'expérience"
         brillant: true
       commandes:
-        - shwithdraw givexpbottle %player% 10000 1
-    - id: entonnoir
-      poids: 3
-      prix: 7500000
-      objet:
-        materiau: HOPPER
-        quantite: 1
-        nom: "&6Entonnoir"
-      commandes:
-        - "minecraft:give %player% hopper 1"
-    - id: livre-planteur-verrues-3
+        - "minecraft:xp add %player% 30 levels"
+    - id: tete-de-wither
       poids: 2
-      prix: 3700000
+      prix: 25000
       objet:
-        materiau: ENCHANTED_BOOK
+        materiau: WITHER_SKELETON_SKULL
         quantite: 1
-        nom: "&5Planteur de Verrues III"
-        description:
-          - "&7Réussite garantie : &a100 %"
-        brillant: true
+        nom: "&8Tête de Wither"
       commandes:
-        - shenchants give book %player% wartplanteur 3 100
-    - id: deco-whisky
-      poids: 1
-      prix: 1300000
-      objet:
-        materiau: LANTERN
-        quantite: 1
-        nom: "&6Whisky &7(&6✯✯✯&7)"
-        description:
-          - "&7Décoration à poser"
-      commandes:
-        - blockdisplaycreator custom-block give 3_Whisky %player% 1
+        - "minecraft:give %player% wither_skeleton_skull 1"
 
 # Items interdits (blacklist)
 # Les joueurs ne pourront pas vendre ces items. Utilisez les noms de matériaux Bukkit.
