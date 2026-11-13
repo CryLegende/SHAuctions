@@ -283,7 +283,30 @@ public final class ServerAuctionManager {
         return def;
     }
 
-    private Lot drawLot(List<Lot> lots) {
+    /**
+     * Lot tiré au sort au prorata des poids, hors lots déjà lancés (enchère ou vente) depuis moins de
+     * {@code repetition-minimale-heures} ; s'il ne reste aucun autre lot tirable, tous les lots repassent au tirage.
+     */
+    private Lot drawLot(Kind kind, List<Lot> lots) {
+        long hours = Math.max(0, config().getInt(section(kind) + "repetition-minimale-heures", 24));
+        if (hours > 0) {
+            long since = System.currentTimeMillis() / 1000L - hours * 3600L;
+            Set<String> recent = new HashSet<>();
+            for (Entry entry : schedule.entries()) {
+                if (entry.status() == Status.LANCEE && entry.lot() != null && entry.start() >= since) {
+                    recent.add(entry.lot().toLowerCase(Locale.ROOT));
+                }
+            }
+            List<Lot> fresh = lots.stream().filter(lot -> !recent.contains(lot.id().toLowerCase(Locale.ROOT))).toList();
+            Lot lot = weighted(fresh);
+            if (lot != null) {
+                return lot;
+            }
+        }
+        return weighted(lots);
+    }
+
+    private Lot weighted(List<Lot> lots) {
         int total = lots.stream().mapToInt(Lot::weight).sum();
         if (total <= 0) {
             return null;
@@ -315,7 +338,7 @@ public final class ServerAuctionManager {
             changed = true;
         }
         for (Entry entry : due.toLaunch()) {
-            Lot lot = drawLot(parseLots(entry.kind(), false));
+            Lot lot = drawLot(entry.kind(), parseLots(entry.kind(), false));
             long id = lot == null ? -1 : create(lot, entry.duration());
             if (id < 0) {
                 plugin.getLogger().warning(label(entry.kind()) + " du serveur de " + format(entry.start()) + " non lancée (aucun lot valide ou erreur base).");
@@ -616,7 +639,7 @@ public final class ServerAuctionManager {
         List<Lot> lots = parseLots(kind, false);
         Lot lot = null;
         if ("random".equalsIgnoreCase(lotArg)) {
-            lot = drawLot(lots);
+            lot = drawLot(kind, lots);
         } else {
             for (Lot candidate : lots) {
                 if (candidate.id().equalsIgnoreCase(lotArg)) {

@@ -180,6 +180,7 @@ bids:
 # même heure d'un jour à l'autre. Il est gardé dans encheres-serveur.yml avec celui des ventes : les redémarrages ne
 # le changent pas. Une enchère dont l'heure passe serveur éteint est lancée au démarrage si sa plage n'est pas finie.
 # Changer ces réglages refait la suite de la semaine (ce qui a déjà été lancé aujourd'hui compte dans le jour).
+# Si l'écart minimal ne laisse pas la place d'en mettre autant dans un jour, ce jour en reçoit moins.
 # Mode réseau : seul le serveur où actif vaut true tient le planning et lance les enchères ; tous les serveurs les
 # affichent, prennent les mises et peuvent les régler.
 encheres-serveur:
@@ -188,18 +189,21 @@ encheres-serveur:
   vendeur: SkyHand
   # Nombre d'enchères par jour, tiré entre min et max chaque jour (le jour de la mise en route, au prorata de la plage restante)
   par-jour:
-    min: 1
-    max: 3
+    min: 2
+    max: 5
   # Plage horaire des débuts, HH:mm. Une fin plus tôt que le début fait passer la plage après minuit.
   plage-horaire:
     debut: "12:00"
-    fin: "23:30"
+    fin: "21:30"
   # Écart minimal entre les débuts de deux enchères du serveur, en minutes
-  ecart-minimal-minutes: 180
+  ecart-minimal-minutes: 90
   # Durée de chaque enchère, tirée entre min et max, en minutes
   duree-minutes:
     min: 120
-    max: 240
+    max: 180
+  # Un lot lancé (enchère ou vente du serveur) depuis moins de ce nombre d'heures n'est pas retiré au sort, sauf s'il ne
+  # reste aucun autre lot tirable (0 = aucune limite)
+  repetition-minimale-heures: 24
   # Son joué à chaque joueur avec l'annonce d'une nouvelle enchère du serveur (vide = aucun son)
   son-annonce: ""
   # Lots, tirés au sort à chaque enchère au prorata de leur poids :
@@ -211,318 +215,18 @@ encheres-serveur:
   #                   brillant (reflet d'enchantement), texture (base64, pour une PLAYER_HEAD)
   #   commandes       lancées par la console pour le gagnant, %player% = son pseudo
   lots:
-    - id: cle-ordinaire
-      poids: 25
-      prix-depart: 100000
-      increment-min: 5000
-      objet:
-        materiau: TRIPWIRE_HOOK
-        quantite: 1
-        nom: "&eClé Ordinaire"
-        brillant: true
-      commandes:
-        - shcrates givekey %player% ordinaire 1 physical
-    - id: cles-ordinaires-x3
-      poids: 10
-      prix-depart: 280000
-      increment-min: 15000
-      objet:
-        materiau: TRIPWIRE_HOOK
-        quantite: 3
-        nom: "&eClé Ordinaire"
-        brillant: true
-      commandes:
-        - shcrates givekey %player% ordinaire 3 physical
-    - id: enchantement-ordinaire
-      poids: 10
-      prix-depart: 200000
-      increment-min: 10000
-      objet:
-        materiau: BOOK
-        quantite: 1
-        nom: "&7Enchantement &eOrdinaire"
-        brillant: true
-      commandes:
-        - shenchants give rcbook %player% ordinaire 1
-    - id: spawner-poulet
-      poids: 8
-      prix-depart: 90000
-      increment-min: 5000
-      objet:
-        materiau: SPAWNER
-        quantite: 1
-        nom: "&eSpawner à Poulet"
-      commandes:
-        - ws give %player% spawner CHICKEN 1
-    - id: spawner-mystere-commun
-      poids: 8
-      prix-depart: 120000
-      increment-min: 5000
-      objet:
-        materiau: ENDER_CHEST
-        quantite: 1
-        nom: "&6Spawner Mystère &7(&eCommun&7)"
-      commandes:
-        - voucher give mysteryspawner1 1 %player%
-    - id: fiole-xp-50000
-      poids: 8
-      prix-depart: 800000
-      increment-min: 40000
-      objet:
-        materiau: EXPERIENCE_BOTTLE
-        quantite: 1
-        nom: "&aBouteille de 50 000 XP"
-        brillant: true
-      commandes:
-        - shwithdraw givexpbottle %player% 50000 1
-    - id: collecteur-petit
-      poids: 6
-      prix-depart: 350000
-      increment-min: 20000
-      objet:
-        materiau: BARREL
-        quantite: 1
-        nom: "&dCoffre collecteur &f(&dpetit&f)"
-      commandes:
-        - advancedchests give %player% collecteur-petit 1
-    - id: sable-x64
-      poids: 6
-      prix-depart: 1500000
-      increment-min: 75000
-      objet:
-        materiau: SAND
-        quantite: 64
-        nom: "&eSable"
-      commandes:
-        - minecraft:give %player% sand 64
-    - id: tete-de-wither
-      poids: 5
-      prix-depart: 60000
-      increment-min: 5000
-      objet:
-        materiau: WITHER_SKELETON_SKULL
-        quantite: 1
-        nom: "&8Tête de Wither"
-      commandes:
-        - minecraft:give %player% wither_skeleton_skull 1
-    - id: balise
-      poids: 5
-      prix-depart: 280000
-      increment-min: 15000
-      objet:
-        materiau: BEACON
-        quantite: 1
-        nom: "&bBalise"
-      commandes:
-        - minecraft:give %player% beacon 1
-    - id: ancre-teleportation
-      poids: 5
-      prix-depart: 350000
-      increment-min: 20000
-      objet:
-        materiau: RESPAWN_ANCHOR
-        quantite: 1
-        nom: "&6Ancre de Téléportation"
-      commandes:
-        - shanchors give %player% 1
-    - id: oeuf-de-dragon
-      poids: 5
-      prix-depart: 600000
-      increment-min: 30000
-      objet:
-        materiau: DRAGON_EGG
-        quantite: 1
-        nom: "&5Œuf de dragon"
-      commandes:
-        - minecraft:give %player% dragon_egg 1
-    - id: lingot-netherite
-      poids: 5
-      prix-depart: 700000
-      increment-min: 35000
-      objet:
-        materiau: NETHERITE_INGOT
-        quantite: 1
-        nom: "&8Lingot de Netherite"
-      commandes:
-        - minecraft:give %player% netherite_ingot 1
-    - id: spawner-mystere-rare
-      poids: 5
-      prix-depart: 400000
-      increment-min: 20000
-      objet:
-        materiau: ENDER_CHEST
-        quantite: 1
-        nom: "&6Spawner Mystère &7(&5Rare&7)"
-      commandes:
-        - voucher give mysteryspawner2 1 %player%
-    - id: eclats-echo-x3
-      poids: 5
-      prix-depart: 1800000
-      increment-min: 90000
-      objet:
-        materiau: ECHO_SHARD
-        quantite: 3
-        nom: "&3Éclat d'écho"
-      commandes:
-        - minecraft:give %player% echo_shard 3
-    - id: coffre-ameliore-moyen
-      poids: 4
-      prix-depart: 400000
-      increment-min: 20000
-      objet:
-        materiau: CHEST
-        quantite: 1
-        nom: "&5Coffre amélioré &f(&5Moyen&f)"
-      commandes:
-        - advancedchests give %player% moyen 1
-    - id: spawner-slime
-      poids: 4
-      prix-depart: 800000
-      increment-min: 40000
-      objet:
-        materiau: SPAWNER
-        quantite: 1
-        nom: "&aSpawner à Slime"
-      commandes:
-        - ws give %player% spawner SLIME 1
-    - id: spawner-vache
-      poids: 4
-      prix-depart: 700000
-      increment-min: 35000
-      objet:
-        materiau: SPAWNER
-        quantite: 1
-        nom: "&eSpawner à Vache"
-      commandes:
-        - ws give %player% spawner COW 1
-    - id: ardoises-renforcees-x5
-      poids: 4
-      prix-depart: 1600000
-      increment-min: 80000
-      objet:
-        materiau: REINFORCED_DEEPSLATE
-        quantite: 5
-        nom: "&8Ardoise des abîmes renforcée"
-      commandes:
-        - minecraft:give %player% reinforced_deepslate 5
-    - id: enchantement-epique
-      poids: 4
-      prix-depart: 1000000
-      increment-min: 50000
-      objet:
-        materiau: BOOK
-        quantite: 1
-        nom: "&7Enchantement &5Épique"
-        brillant: true
-      commandes:
-        - shenchants give rcbook %player% Epique 1
-    - id: observateurs-x8
-      poids: 4
-      prix-depart: 3200000
-      increment-min: 160000
-      objet:
-        materiau: OBSERVER
-        quantite: 8
-        nom: "&7Observateur"
-      commandes:
-        - minecraft:give %player% observer 8
-    - id: livre-raccommodage
-      poids: 3
-      prix-depart: 1800000
-      increment-min: 90000
-      objet:
-        materiau: ENCHANTED_BOOK
-        quantite: 1
-        nom: "&bLivre &fRaccommodage"
-        brillant: true
-      commandes:
-        - "minecraft:give %player% enchanted_book[stored_enchantments={\"minecraft:mending\":1}] 1"
-    - id: livre-toucher-de-soie
-      poids: 3
-      prix-depart: 1800000
-      increment-min: 90000
-      objet:
-        materiau: ENCHANTED_BOOK
-        quantite: 1
-        nom: "&bLivre &fToucher de soie"
-        brillant: true
-      commandes:
-        - "minecraft:give %player% enchanted_book[stored_enchantments={\"minecraft:silk_touch\":1}] 1"
-    - id: livre-efficacite-5
-      poids: 3
-      prix-depart: 1500000
-      increment-min: 75000
-      objet:
-        materiau: ENCHANTED_BOOK
-        quantite: 1
-        nom: "&bLivre &fEfficacité V"
-        brillant: true
-      commandes:
-        - "minecraft:give %player% enchanted_book[stored_enchantments={\"minecraft:efficiency\":5}] 1"
-    - id: livre-solidite-3
-      poids: 3
-      prix-depart: 1200000
-      increment-min: 60000
-      objet:
-        materiau: ENCHANTED_BOOK
-        quantite: 1
-        nom: "&bLivre &fSolidité III"
-        brillant: true
-      commandes:
-        - "minecraft:give %player% enchanted_book[stored_enchantments={\"minecraft:unbreaking\":3}] 1"
-    - id: redstone-x4
-      poids: 3
-      prix-depart: 2000000
-      increment-min: 100000
-      objet:
-        materiau: REDSTONE
-        quantite: 4
-        nom: "&cRedstone"
-      commandes:
-        - minecraft:give %player% redstone 4
-    - id: spawner-squelette
-      poids: 2
-      prix-depart: 1800000
-      increment-min: 90000
-      objet:
-        materiau: SPAWNER
-        quantite: 1
-        nom: "&fSpawner à Squelette"
-      commandes:
-        - ws give %player% spawner SKELETON 1
-    - id: enchantement-legendaire
-      poids: 2
-      prix-depart: 2500000
-      increment-min: 125000
-      objet:
-        materiau: BOOK
-        quantite: 1
-        nom: "&7Enchantement &6Légendaire"
-        brillant: true
-      commandes:
-        - shenchants give rcbook %player% legendaire 1
-    - id: druse
-      poids: 2
-      prix-depart: 700000
-      increment-min: 35000
-      objet:
-        materiau: BUDDING_AMETHYST
-        quantite: 1
-        nom: "&dDruse d'améthyste"
-      commandes:
-        - minecraft:give %player% budding_amethyst 1
     - id: entonnoir
-      poids: 2
-      prix-depart: 6000000
-      increment-min: 300000
+      poids: 8
+      prix-depart: 5000000
+      increment-min: 250000
       objet:
         materiau: HOPPER
         quantite: 1
         nom: "&6Entonnoir"
       commandes:
-        - minecraft:give %player% hopper 1
+        - "minecraft:give %player% hopper 1"
     - id: cle-rare
-      poids: 2
+      poids: 6
       prix-depart: 700000
       increment-min: 35000
       objet:
@@ -532,6 +236,30 @@ encheres-serveur:
         brillant: true
       commandes:
         - shcrates givekey %player% rare 1 physical
+    - id: livre-planteur-verrues-3
+      poids: 4
+      prix-depart: 2500000
+      increment-min: 120000
+      objet:
+        materiau: ENCHANTED_BOOK
+        quantite: 1
+        nom: "&5Planteur de Verrues III"
+        description:
+          - "&7Réussite garantie : &a100 %"
+        brillant: true
+      commandes:
+        - shenchants give book %player% wartplanteur 3 100
+    - id: cle-ordinaire
+      poids: 3
+      prix-depart: 90000
+      increment-min: 5000
+      objet:
+        materiau: TRIPWIRE_HOOK
+        quantite: 1
+        nom: "&eClé Ordinaire"
+        brillant: true
+      commandes:
+        - shcrates givekey %player% ordinaire 1 physical
 
 # Ventes du serveur : chaque jour, le serveur met aussi quelques lots en vente à prix fixe dans la page Ventes, vendeur
 # affiché « vendeur ». Un seul exemplaire par vente : il disparaît une fois acheté ou à la fin de sa durée. Le prix
@@ -545,18 +273,21 @@ ventes-serveur:
   vendeur: SkyHand
   # Nombre de ventes par jour, tiré entre min et max chaque jour (le jour de la mise en route, au prorata de la plage restante)
   par-jour:
-    min: 1
-    max: 3
+    min: 2
+    max: 5
   # Plage horaire des mises en vente, HH:mm. Une fin plus tôt que le début fait passer la plage après minuit.
   plage-horaire:
-    debut: "12:00"
+    debut: "10:00"
     fin: "23:30"
   # Écart minimal entre deux mises en vente, et entre une mise en vente et le début d'une enchère, en minutes
-  ecart-minimal-minutes: 60
+  ecart-minimal-minutes: 30
   # Durée de mise en vente, tirée entre min et max, en minutes
   duree-minutes:
     min: 360
     max: 720
+  # Un lot lancé (enchère ou vente du serveur) depuis moins de ce nombre d'heures n'est pas retiré au sort, sauf s'il ne
+  # reste aucun autre lot tirable (0 = aucune limite)
+  repetition-minimale-heures: 24
   # Son joué à chaque joueur avec l'annonce d'une nouvelle vente du serveur (vide = aucun son)
   son-annonce: ""
   # Lots, tirés au sort à chaque vente au prorata de leur poids :
@@ -568,7 +299,7 @@ ventes-serveur:
   #   commandes       lancées par la console pour l'acheteur, %player% = son pseudo
   lots:
     - id: cle-ordinaire
-      poids: 25
+      poids: 10
       prix: 150000
       objet:
         materiau: TRIPWIRE_HOOK
@@ -577,279 +308,9 @@ ventes-serveur:
         brillant: true
       commandes:
         - shcrates givekey %player% ordinaire 1 physical
-    - id: cles-ordinaires-x3
-      poids: 10
-      prix: 400000
-      objet:
-        materiau: TRIPWIRE_HOOK
-        quantite: 3
-        nom: "&eClé Ordinaire"
-        brillant: true
-      commandes:
-        - shcrates givekey %player% ordinaire 3 physical
-    - id: enchantement-ordinaire
-      poids: 10
-      prix: 300000
-      objet:
-        materiau: BOOK
-        quantite: 1
-        nom: "&7Enchantement &eOrdinaire"
-        brillant: true
-      commandes:
-        - shenchants give rcbook %player% ordinaire 1
-    - id: spawner-poulet
-      poids: 8
-      prix: 150000
-      objet:
-        materiau: SPAWNER
-        quantite: 1
-        nom: "&eSpawner à Poulet"
-      commandes:
-        - ws give %player% spawner CHICKEN 1
-    - id: spawner-mystere-commun
-      poids: 8
-      prix: 180000
-      objet:
-        materiau: ENDER_CHEST
-        quantite: 1
-        nom: "&6Spawner Mystère &7(&eCommun&7)"
-      commandes:
-        - voucher give mysteryspawner1 1 %player%
-    - id: fiole-xp-50000
-      poids: 8
-      prix: 1500000
-      objet:
-        materiau: EXPERIENCE_BOTTLE
-        quantite: 1
-        nom: "&aBouteille de 50 000 XP"
-        brillant: true
-      commandes:
-        - shwithdraw givexpbottle %player% 50000 1
-    - id: collecteur-petit
-      poids: 6
-      prix: 500000
-      objet:
-        materiau: BARREL
-        quantite: 1
-        nom: "&dCoffre collecteur &f(&dpetit&f)"
-      commandes:
-        - advancedchests give %player% collecteur-petit 1
-    - id: sable-x64
-      poids: 6
-      prix: 2200000
-      objet:
-        materiau: SAND
-        quantite: 64
-        nom: "&eSable"
-      commandes:
-        - minecraft:give %player% sand 64
-    - id: tete-de-wither
-      poids: 5
-      prix: 100000
-      objet:
-        materiau: WITHER_SKELETON_SKULL
-        quantite: 1
-        nom: "&8Tête de Wither"
-      commandes:
-        - minecraft:give %player% wither_skeleton_skull 1
-    - id: balise
-      poids: 5
-      prix: 400000
-      objet:
-        materiau: BEACON
-        quantite: 1
-        nom: "&bBalise"
-      commandes:
-        - minecraft:give %player% beacon 1
-    - id: ancre-teleportation
-      poids: 5
-      prix: 500000
-      objet:
-        materiau: RESPAWN_ANCHOR
-        quantite: 1
-        nom: "&6Ancre de Téléportation"
-      commandes:
-        - shanchors give %player% 1
-    - id: oeuf-de-dragon
-      poids: 5
-      prix: 900000
-      objet:
-        materiau: DRAGON_EGG
-        quantite: 1
-        nom: "&5Œuf de dragon"
-      commandes:
-        - minecraft:give %player% dragon_egg 1
-    - id: lingot-netherite
-      poids: 5
-      prix: 1000000
-      objet:
-        materiau: NETHERITE_INGOT
-        quantite: 1
-        nom: "&8Lingot de Netherite"
-      commandes:
-        - minecraft:give %player% netherite_ingot 1
-    - id: spawner-mystere-rare
-      poids: 5
-      prix: 600000
-      objet:
-        materiau: ENDER_CHEST
-        quantite: 1
-        nom: "&6Spawner Mystère &7(&5Rare&7)"
-      commandes:
-        - voucher give mysteryspawner2 1 %player%
-    - id: eclats-echo-x3
-      poids: 5
-      prix: 2500000
-      objet:
-        materiau: ECHO_SHARD
-        quantite: 3
-        nom: "&3Éclat d'écho"
-      commandes:
-        - minecraft:give %player% echo_shard 3
-    - id: coffre-ameliore-moyen
-      poids: 4
-      prix: 600000
-      objet:
-        materiau: CHEST
-        quantite: 1
-        nom: "&5Coffre amélioré &f(&5Moyen&f)"
-      commandes:
-        - advancedchests give %player% moyen 1
-    - id: spawner-slime
-      poids: 4
-      prix: 1200000
-      objet:
-        materiau: SPAWNER
-        quantite: 1
-        nom: "&aSpawner à Slime"
-      commandes:
-        - ws give %player% spawner SLIME 1
-    - id: spawner-vache
-      poids: 4
-      prix: 1000000
-      objet:
-        materiau: SPAWNER
-        quantite: 1
-        nom: "&eSpawner à Vache"
-      commandes:
-        - ws give %player% spawner COW 1
-    - id: ardoises-renforcees-x5
-      poids: 4
-      prix: 2200000
-      objet:
-        materiau: REINFORCED_DEEPSLATE
-        quantite: 5
-        nom: "&8Ardoise des abîmes renforcée"
-      commandes:
-        - minecraft:give %player% reinforced_deepslate 5
-    - id: enchantement-epique
-      poids: 4
-      prix: 1400000
-      objet:
-        materiau: BOOK
-        quantite: 1
-        nom: "&7Enchantement &5Épique"
-        brillant: true
-      commandes:
-        - shenchants give rcbook %player% Epique 1
-    - id: observateurs-x8
-      poids: 4
-      prix: 4500000
-      objet:
-        materiau: OBSERVER
-        quantite: 8
-        nom: "&7Observateur"
-      commandes:
-        - minecraft:give %player% observer 8
-    - id: livre-raccommodage
-      poids: 3
-      prix: 2500000
-      objet:
-        materiau: ENCHANTED_BOOK
-        quantite: 1
-        nom: "&bLivre &fRaccommodage"
-        brillant: true
-      commandes:
-        - "minecraft:give %player% enchanted_book[stored_enchantments={\"minecraft:mending\":1}] 1"
-    - id: livre-toucher-de-soie
-      poids: 3
-      prix: 2500000
-      objet:
-        materiau: ENCHANTED_BOOK
-        quantite: 1
-        nom: "&bLivre &fToucher de soie"
-        brillant: true
-      commandes:
-        - "minecraft:give %player% enchanted_book[stored_enchantments={\"minecraft:silk_touch\":1}] 1"
-    - id: livre-efficacite-5
-      poids: 3
-      prix: 2200000
-      objet:
-        materiau: ENCHANTED_BOOK
-        quantite: 1
-        nom: "&bLivre &fEfficacité V"
-        brillant: true
-      commandes:
-        - "minecraft:give %player% enchanted_book[stored_enchantments={\"minecraft:efficiency\":5}] 1"
-    - id: livre-solidite-3
-      poids: 3
-      prix: 1800000
-      objet:
-        materiau: ENCHANTED_BOOK
-        quantite: 1
-        nom: "&bLivre &fSolidité III"
-        brillant: true
-      commandes:
-        - "minecraft:give %player% enchanted_book[stored_enchantments={\"minecraft:unbreaking\":3}] 1"
-    - id: redstone-x4
-      poids: 3
-      prix: 3000000
-      objet:
-        materiau: REDSTONE
-        quantite: 4
-        nom: "&cRedstone"
-      commandes:
-        - minecraft:give %player% redstone 4
-    - id: spawner-squelette
-      poids: 2
-      prix: 2500000
-      objet:
-        materiau: SPAWNER
-        quantite: 1
-        nom: "&fSpawner à Squelette"
-      commandes:
-        - ws give %player% spawner SKELETON 1
-    - id: enchantement-legendaire
-      poids: 2
-      prix: 3500000
-      objet:
-        materiau: BOOK
-        quantite: 1
-        nom: "&7Enchantement &6Légendaire"
-        brillant: true
-      commandes:
-        - shenchants give rcbook %player% legendaire 1
-    - id: druse
-      poids: 2
-      prix: 1000000
-      objet:
-        materiau: BUDDING_AMETHYST
-        quantite: 1
-        nom: "&dDruse d'améthyste"
-      commandes:
-        - minecraft:give %player% budding_amethyst 1
-    - id: entonnoir
-      poids: 2
-      prix: 8000000
-      objet:
-        materiau: HOPPER
-        quantite: 1
-        nom: "&6Entonnoir"
-      commandes:
-        - minecraft:give %player% hopper 1
     - id: cle-rare
-      poids: 2
-      prix: 1000000
+      poids: 6
+      prix: 1200000
       objet:
         materiau: TRIPWIRE_HOOK
         quantite: 1
@@ -857,6 +318,48 @@ ventes-serveur:
         brillant: true
       commandes:
         - shcrates givekey %player% rare 1 physical
+    - id: fiole-xp-10000
+      poids: 5
+      prix: 650000
+      objet:
+        materiau: EXPERIENCE_BOTTLE
+        quantite: 1
+        nom: "&aBouteille de 10 000 XP"
+        brillant: true
+      commandes:
+        - shwithdraw givexpbottle %player% 10000 1
+    - id: entonnoir
+      poids: 3
+      prix: 7500000
+      objet:
+        materiau: HOPPER
+        quantite: 1
+        nom: "&6Entonnoir"
+      commandes:
+        - "minecraft:give %player% hopper 1"
+    - id: livre-planteur-verrues-3
+      poids: 2
+      prix: 3700000
+      objet:
+        materiau: ENCHANTED_BOOK
+        quantite: 1
+        nom: "&5Planteur de Verrues III"
+        description:
+          - "&7Réussite garantie : &a100 %"
+        brillant: true
+      commandes:
+        - shenchants give book %player% wartplanteur 3 100
+    - id: deco-whisky
+      poids: 1
+      prix: 1300000
+      objet:
+        materiau: LANTERN
+        quantite: 1
+        nom: "&6Whisky &7(&6✯✯✯&7)"
+        description:
+          - "&7Décoration à poser"
+      commandes:
+        - blockdisplaycreator custom-block give 3_Whisky %player% 1
 
 # Items interdits (blacklist)
 # Les joueurs ne pourront pas vendre ces items. Utilisez les noms de matériaux Bukkit.
