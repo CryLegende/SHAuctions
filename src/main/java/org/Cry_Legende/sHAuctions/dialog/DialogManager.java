@@ -172,7 +172,7 @@ public final class DialogManager {
             if (closeInventory) {
                 viewer.closeInventory();
             }
-            viewer.showDialog(dialog);
+            plugin.getBlindness().show(viewer, dialog);
             return true;
         } catch (RuntimeException | LinkageError e) {
             if (created != null) {
@@ -189,6 +189,10 @@ public final class DialogManager {
         Map<String, Component> placeholders = placeholders(live);
 
         List<DialogBody> body = new ArrayList<>();
+        String title = messages.getRaw(base + "titre", "");
+        if (!title.isBlank()) {
+            body.add(DialogBody.plainMessage(render(title, placeholders), WIDTH));
+        }
         if (error != null) {
             body.add(DialogBody.plainMessage(error, WIDTH));
         }
@@ -205,7 +209,8 @@ public final class DialogManager {
         ActionButton ok = button(messages.getRaw(base + "valider", "&a&lValider"), state, ACTION_OK, placeholders);
         ActionButton cancel = button(messages.getRaw(base + "annuler", "&c&lAnnuler"), state, ACTION_CANCEL, placeholders);
 
-        DialogBase dialogBase = DialogBase.builder(render(messages.getRaw(base + "titre", ""), placeholders))
+        // titre vide : l'icône d'avertissement du client reste seule sur sa ligne, le titre est la première ligne du corps
+        DialogBase dialogBase = DialogBase.builder(Component.empty())
                 // Échap = bouton « Annuler » : le client lance son action, la saisie est annulée proprement.
                 .canCloseWithEscape(true)
                 // fermé au clic : le client ne retire pas son écran d'attente quand le serveur ferme le dialogue
@@ -486,7 +491,7 @@ public final class DialogManager {
 
     private void safeClose(Player player) {
         try {
-            player.closeDialog();
+            plugin.getBlindness().close(player);
         } catch (RuntimeException e) {
             plugin.getLogger().log(Level.FINE, "Fermeture du dialogue impossible pour " + player.getName(), e);
         }

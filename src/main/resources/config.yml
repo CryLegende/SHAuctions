@@ -952,6 +952,10 @@ dialogues:
   min-protocol: 771
   # Durée de validité d'un dialogue ouvert, en secondes : passé ce délai, valider ne fait plus rien
   expiration-secondes: 300
+  # Effet Cécité tant qu'un dialogue de ce plugin est affiché : le texte se lit sur fond noir. Il est retiré dès que le joueur
+  # tourne la caméra, se déplace ou ouvre un inventaire (le client ne prévient pas le serveur quand il ferme un dialogue).
+  # Un joueur déjà aveugle pour une autre raison n'est pas touché.
+  aveugler-pendant-dialogues: true
 
 # Onglet « Recherches » (/hdv recherche) : les joueurs publient ce qu'ils cherchent, les autres les contactent
 # par mail (même hors ligne). Aucun argent ni objet ne bouge. Publications et suppressions écrites dans la console.

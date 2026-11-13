@@ -241,6 +241,10 @@ public final class WantedManager {
             String token = newToken();
             int max = Math.min(256, config().getInt("recherches.longueur-max", 80));
             List<DialogBody> body = new ArrayList<>();
+            String title = messages().getRaw("dialogues.recherche.titre", "&8Nouvelle recherche");
+            if (!title.isBlank()) {
+                body.add(DialogBody.plainMessage(AMP.deserialize(title), 250));
+            }
             for (String line : messages().getRawList("dialogues.recherche.corps")) {
                 body.add(DialogBody.plainMessage(AMP.deserialize(line.replace("%max%", String.valueOf(max))), 250));
             }
@@ -248,7 +252,8 @@ public final class WantedManager {
                 .width(250).maxLength(max).initial("").build();
             ActionButton ok = button(messages().getRaw("dialogues.recherche.valider", "&a&lPublier"), token, "ok");
             ActionButton cancel = button(messages().getRaw("dialogues.recherche.annuler", "&c&lAnnuler"), token, "cancel");
-            DialogBase base = DialogBase.builder(AMP.deserialize(messages().getRaw("dialogues.recherche.titre", "&8Nouvelle recherche")))
+            // titre vide : l'icône d'avertissement du client reste seule sur sa ligne, le titre est la première ligne du corps
+            DialogBase base = DialogBase.builder(Component.empty())
                 .canCloseWithEscape(true)
                 .afterAction(DialogBase.DialogAfterAction.CLOSE)
                 .body(body)
@@ -257,7 +262,7 @@ public final class WantedManager {
             Dialog dialog = Dialog.create(factory -> factory.empty().base(base).type(DialogType.confirmation(ok, cancel)));
             dialogTokens.put(player.getUniqueId(), token);
             player.closeInventory();
-            player.showDialog(dialog);
+            plugin.getBlindness().show(player, dialog);
         } catch (RuntimeException | LinkageError e) {
             dialogTokens.remove(player.getUniqueId());
             plugin.getLogger().log(Level.WARNING, "Dialogue de recherche impossible pour " + player.getName(), e);
@@ -291,6 +296,8 @@ public final class WantedManager {
             if (!dialogTokens.remove(player.getUniqueId(), parts[1])) {
                 return;
             }
+            // le client a refermé le dialogue au clic : la vue est rendue au joueur
+            plugin.getBlindness().close(player);
             if ("ok".equals(parts[2])) {
                 if (create(player, text)) {
                     plugin.getGuiManager().openWantedMenu(player, 1);

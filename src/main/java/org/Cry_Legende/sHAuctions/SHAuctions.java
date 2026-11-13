@@ -58,6 +58,8 @@ public class SHAuctions extends JavaPlugin {
     private org.Cry_Legende.sHAuctions.wanted.WantedManager wantedManager;
     // null si l'API des dialogues est absente du serveur (saisie par chat uniquement)
     private DialogManager dialogManager;
+    // Cécité du joueur tant qu'un dialogue du plugin est affiché
+    private DialogBlindness blindness;
     private ExpirationTask expirationTask;
     private MenuRefreshListener menuRefreshListener;
     private RealTimeLoreUpdateTask realTimeLoreUpdateTask;
@@ -85,6 +87,7 @@ public class SHAuctions extends JavaPlugin {
             return;
         }
         getLogger().info("Configurations loaded successfully.");
+        blindness = new DialogBlindness(this, configManager.getBoolean("dialogues.aveugler-pendant-dialogues", true));
 
         economyProvider = new EconomyProvider(this);
         if (!economyProvider.setupEconomy()) {
@@ -196,6 +199,9 @@ public class SHAuctions extends JavaPlugin {
         if (dialogManager != null) {
             dialogManager.shutdown();
         }
+        if (blindness != null) {
+            blindness.shutdown();
+        }
         getLogger().info("------------------------------------");
         getLogger().info(ChatColor.RED + pdf.getName() + " disabling...");
 
@@ -289,6 +295,7 @@ public class SHAuctions extends JavaPlugin {
             return false;
         }
         configManager.apply(newConfig);
+        blindness.setEnabled(configManager.getBoolean("dialogues.aveugler-pendant-dialogues", true));
         messageManager.apply(newMessages);
         menuConfigManager.apply(newMenus);
         scheduleExpirationTask();
@@ -408,5 +415,12 @@ public class SHAuctions extends JavaPlugin {
      */
     public DialogManager getDialogManager() {
         return dialogManager;
+    }
+
+    /**
+     * Affichage et fermeture des dialogues, avec la cécité du joueur pendant qu'ils sont à l'écran.
+     */
+    public DialogBlindness getBlindness() {
+        return blindness;
     }
 }
